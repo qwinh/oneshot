@@ -3,6 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:oneshot/services/auth_service.dart';
 import 'package:oneshot/screens/auth/login_screen.dart';
+import 'package:oneshot/screens/profile/edit_prime_screen.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -21,7 +22,7 @@ class OneShotApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
         primaryColor: Colors.white,
-        scaffoldBackgroundColor: Colors.grey[950],
+        scaffoldBackgroundColor: Colors.grey[955],
       ),
       home: const AuthGateRouter(),
     );
@@ -232,8 +233,7 @@ class _EmailVerificationGateScreenState
   }
 }
 
-/// Simple intermediate layout demonstrating a logged-in flow.
-/// This will be expanded in the next implementation phases.
+/// Dynamic Home Screen routing users to configure discovery options
 class MockAuthenticatedHomeScreen extends StatelessWidget {
   const MockAuthenticatedHomeScreen({super.key});
 
@@ -244,7 +244,7 @@ class MockAuthenticatedHomeScreen extends StatelessWidget {
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('OneShot Feed Shell'),
+        title: const Text('OneShot Dashboard'),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
@@ -259,28 +259,58 @@ class MockAuthenticatedHomeScreen extends StatelessWidget {
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
               const Icon(
-                Icons.check_circle_outline,
-                size: 60,
-                color: Colors.greenAccent,
+                Icons.account_circle_outlined,
+                size: 70,
+                color: Colors.white70,
               ),
               const SizedBox(height: 16),
-              const Text(
-                'Successfully Authorized',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
+              Text(
+                'Welcome to OneShot',
+                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
+                  color: Colors.white,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 8),
               Text(
-                'Current UID: $currentUserId',
+                'Author UID: $currentUserId',
                 style: const TextStyle(
                   fontFamily: 'monospace',
                   color: Colors.grey,
                 ),
                 textAlign: TextAlign.center,
               ),
-              const SizedBox(height: 32),
+              const SizedBox(height: 40),
+
+              // Setup Prime Content Button
+              ElevatedButton.icon(
+                onPressed: () {
+                  Navigator.of(context).push(
+                    MaterialPageRoute(builder: (_) => const EditPrimeScreen()),
+                  );
+                },
+                icon: const Icon(Icons.edit_note, color: Colors.black),
+                label: const Text('Configure Discovery Prime'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.white,
+                  foregroundColor: Colors.black,
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 24,
+                    vertical: 16,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
               Text(
-                'Next Step: Prime Content Creation & Profile Configuration.',
-                style: TextStyle(color: Colors.grey[400]),
+                'Setting up your Discovery Prime allows other users to search your tags and discover your single piece of premium scarcity content.',
+                style: TextStyle(
+                  color: Colors.grey[500],
+                  fontSize: 13,
+                  height: 1.4,
+                ),
                 textAlign: TextAlign.center,
               ),
             ],
