@@ -1,0 +1,549 @@
+Software Requirements Specification
+Prime — Scarcity-First Content Platform (PoC)
+Version 1.0  |  2026-06-14  |  Prepared by [Author]
+Revision History
+Name	Date	Reason For Changes	Version
+Initial draft (merged)	2026-06-14	Combined base SRS and PoC interview	1.0
+
+1. Introduction
+This SRS defines functional and non-functional requirements for the Prime platform proof-of-concept. Primary audiences are the two-person development team and investors/stakeholders evaluating the demo. The document defines what the system must do, not how it will be implemented.
+
+1.1 Document Purpose
+This SRS specifies requirements for Prime v0.1 PoC: a web platform enforcing one-chance discovery between creators and viewers. It is the authoritative reference for scope, behaviors, and verification criteria during the concept phase.
+
+1.2 Product Scope
+Prime is a content platform where each creator designates a single prime item (one text post, or up to four images) as their sole discovery artifact. A viewer can only discover any given creator once; all subsequent access requires subscription. The PoC validates the core mechanic and produces an investor-demo-ready build. Out of scope: video, algorithmic feeds, moderation tools, monetization, native mobile apps.
+
+1.3 Definitions, Acronyms, and Abbreviations
+Term	Definition
+Prime content	The single discovery artifact: either one text post (which may contain a link) or a prime set of up to 4 images with names. Mutually exclusive types.
+Prime set	A prime content variant: up to 4 images each with an associated name. Shown simultaneously. Cannot be combined with prime text.
+Discovery chance	The one-time presentation of a creator's prime content to a specific viewer via tag browsing.
+Discovery feed	Derived view: creators whose prime content has not yet been judged by this viewer.
+Subscribe feed	Derived view: all works (prime and non-prime) from creators the viewer has subscribed to.
+Read later feed	Derived view: prime content of creators the viewer marked 'read later'.
+Viewed authors feed	Derived view: all creators whose discovery chance has been consumed, with action type and timestamp.
+Liked authors feed	Derived view: creators the viewer has liked (like does not consume a discovery chance).
+Relation	The per-(viewer, creator) record storing: discovery_consumed, action_type, subscribed, read_later, liked, timestamps.
+Consuming action	Subscribe, Next, or Mark to read later — any of these sets discovery_consumed = true.
+Retained data	Data that, once created, remains accessible to entitled users even after a creator hides or withdraws their profile.
+PoC	Proof of Concept.
+SRS	Software Requirements Specification.
+
+1.4 References
+IEEE Std 830-1998 (informative, SRS structure reference).
+
+1.5 Document Overview
+Section 2 provides product context and constraints. Section 3 contains all verifiable requirements. Section 4 maps requirements to verification methods. Appendix A is a non-normative data model example. Appendix B is a normative definition of all derived feeds.
+
+1.6 Business Context (Informative)
+Problem
+Existing social media platforms incentivize high-volume, low-effort content. Readers are overwhelmed; creators have no mechanism to stake their reputation on finished work. Meaningful contributions are drowned.
+
+Solution Concept
+Prime enforces a strict scarcity rule: each creator gets exactly one discovery chance per viewer, anchored to a single prime content item. Viewers make an explicit choice (Subscribe, Next, Read Later) before moving on. The mechanism forces creators to finalize work before seeking attention.
+
+Success Criteria for PoC
+•	The discovery-chance mechanic works as specified (Section 3.2).
+•	A small group (<100 users) can navigate discovery, subscription, and all feeds.
+•	The system is demonstrable end-to-end in a live browser session for investors.
+
+Business Constraints
+•	Two-person development team.
+•	No legal or compliance obligations beyond a user-facing disclaimer.
+•	No revenue or user growth expectations during concept phase.
+
+2. Product Overview
+2.1 Product Perspective
+Prime is a new, standalone platform built from scratch. It is not part of a larger system. It may integrate an email verification service and an object storage service. All feeds are derived from a single logical relation, ensuring consistency.
+
+2.2 Product Functions
+•	User registration with email verification.
+•	Creator profile: standard post feed + one designated prime content slot (text or image set).
+•	Single logical relation per (viewer, creator) tracking: discovery_consumed, action_type, subscribed, read_later, liked.
+•	All feeds derived from this relation: Discovery, Subscribe, Read Later, Viewed Authors, Liked Authors.
+•	Tag-based discovery browsing (sole discovery mechanism in v0.1).
+•	Consuming actions: Subscribe, Next, Mark to read later — each sets discovery_consumed = true.
+•	Ancillary actions: Like, View Profile — do not consume discovery chance.
+•	Search by creator name or handle, unfiltered by discovery status.
+•	Data retention: once created, records are never permanently destroyed.
+•	Interruption recovery: an un-actioned discovery card re-presents on next session.
+
+2.3 Product Constraints
+•	Web and mobile web only for v0.1 (no native apps).
+•	No video content.
+•	No algorithmic feed; tag browsing only.
+•	Storage quota: 100 MB per user.
+•	No 'right to be forgotten': users are informed that data is retained and subscribers retain access.
+•	Two-person team: complexity must remain manageable.
+•	Infrastructure cost ≤ $50/month during concept phase.
+
+2.4 User Characteristics
+Role	Description
+Viewer	Any authenticated user browsing the discovery feed. Makes consuming or ancillary actions. May also be a creator.
+Creator	Any authenticated user who has published prime content. Accepts that updating prime content does not grant new discovery chances to viewers who have already judged.
+Administrator	The two developers. May hide profiles. Subject to data retention constraints.
+
+2.5 Assumptions and Dependencies
+Assumption / Dependency	Impact if false
+Email delivery is available for auth verification.	Registration flow breaks; OAuth fallback would be needed.
+Object storage service (S3-compatible) is available.	Image uploads have no home; in-DB blobs would be required.
+Discovery chance can be reliably tracked per authenticated account.	Core mechanic fails; login is required for all features.
+Tag browsing is sufficient for discovery without search-based ranking.	Discoverability may be low; acceptable at PoC scale (<100 users).
+Users self-enforce content quality (no pre-publish review).	Low-quality prime content may undermine the value proposition; moderation deferred post-PoC.
+Users comply with the disclaimer that they are solely responsible for content legality.	Legal exposure for the platform; no mitigation in v0.1.
+
+2.6 Apportioning of Requirements
+Area	v0.1 PoC	Deferred
+Auth, registration, email verification	✓	—
+Prime content CRUD (text + image set)	✓	—
+Discovery chance enforcement + relation model	✓	—
+All derived feeds (Discovery, Subscribe, Read Later, Viewed, Liked)	✓	—
+Tag-based discovery browsing	✓	—
+Subscription (subscribe/unsubscribe)	✓	—
+Consuming actions (Subscribe, Next, Read Later)	✓	—
+Ancillary actions (Like, View Profile)	✓	—
+Search by creator name/handle	✓	—
+Interruption handling	✓	—
+Data retention guarantee	✓	—
+Video content	—	Post-PoC
+Algorithmic feed	—	Post-PoC
+Moderation tools	—	Post-PoC
+Notifications	—	Post-PoC
+Native mobile apps	—	Post-PoC
+
+3. Requirements
+All requirements follow this template: ID, Title, Statement (the system shall…), Rationale, Acceptance Criteria, Verification Method.
+
+3.1 External Interfaces
+3.1.1 User Interfaces
+ID	REQ-INT-001
+Title	Responsive layout
+Statement	The system shall render all pages usably on viewport widths from 375px (mobile) to 1440px (desktop) without horizontal scrolling.
+Rationale	Target is web + mobile web.
+Acceptance Criteria	All core pages pass manual review at 375px, 768px, and 1280px.
+Verification	Demonstration
+
+ID	REQ-INT-002
+Title	Discovery card presentation
+Statement	The discovery feed shall present each creator's prime content as a card with the following actions visible: Subscribe, Next, Mark to read later, Like, View Profile. Browsing the profile from this card shall not consume the discovery chance.
+Rationale	Viewers need a clear, actionable interface for each discovery encounter.
+Acceptance Criteria	All five actions are accessible from the discovery card. Tapping View Profile does not set discovery_consumed = true.
+Verification	Demonstration
+
+ID	REQ-INT-003
+Title	Discovery gate in UI
+Statement	Creators whose discovery chance has been consumed by the viewer shall not appear in that viewer's discovery feed or tag browse results.
+Rationale	Core mechanic must be enforced in the UI layer, not only the backend.
+Acceptance Criteria	After consuming a discovery chance for creator X, creator X does not appear in any discovery or tag browse result for that viewer.
+Verification	Test
+
+3.1.2 Hardware Interfaces
+No hardware interfaces in scope for the PoC.
+
+3.1.3 Software Interfaces
+ID	REQ-INT-004
+Title	Image object storage
+Statement	The system shall store uploaded images in an external object storage service (e.g., S3-compatible) and serve them via URL reference. Images shall not be stored in the application database.
+Rationale	Keeps the database lean; images served efficiently.
+Acceptance Criteria	Uploaded images are retrievable via URL. The database contains only the URL reference, not binary data.
+Verification	Inspection
+
+ID	REQ-INT-005
+Title	Email verification service
+Statement	The system shall integrate an external email delivery service capable of sending account verification emails.
+Rationale	Email verification is required before publishing or subscribing.
+Acceptance Criteria	A registered user receives a verification email. Unverified users cannot publish prime content or subscribe.
+Verification	Test
+
+3.2 Functional
+Authentication
+ID	REQ-FUNC-001
+Title	Registration
+Statement	The system shall allow a user to register with a unique email address and a password of at least 8 characters. The system shall record an IP address as an additional identifier. Email verification is required before the user may publish prime content or subscribe.
+Rationale	Identity is required for discovery chance tracking and for abuse prevention.
+Acceptance Criteria	Duplicate email returns an error. Passwords under 8 characters are rejected. Successful registration sends a verification email. Unverified users cannot publish or subscribe.
+Verification	Test
+
+ID	REQ-FUNC-002
+Title	Login / logout
+Statement	The system shall authenticate users via email and password, issue a session token, and invalidate it on logout.
+Rationale	Session management is required for per-user discovery tracking across visits.
+Acceptance Criteria	Valid credentials grant access. Invalid credentials are rejected with an error message. Logout invalidates the session; subsequent requests with the old token are rejected.
+Verification	Test
+
+Prime Content
+ID	REQ-FUNC-003
+Title	Prime content creation
+Statement	An author may publish prime content as either (a) a single prime text post, which may contain a link to external content, or (b) a prime set of up to 4 images each with an associated name. Options (a) and (b) are mutually exclusive for a given author's active prime content.
+Rationale	Fairness between text creators and visual creators.
+Acceptance Criteria	Author selects a content type. System validates: max 4 images for image type, exactly one content type active at a time. Video uploads are rejected.
+Verification	Test
+
+ID	REQ-FUNC-004
+Title	Prime content update
+Statement	An author may update or withdraw prime content at any time. Updating prime content shall not reset or refresh any previously consumed discovery chances.
+Rationale	Authors can refine their work; viewers are not re-exposed after a chance is consumed.
+Acceptance Criteria	A viewer who has consumed a discovery chance for creator X does not see creator X in tag browsing after creator X updates prime content.
+Verification	Test
+
+Discovery and Chance Enforcement
+ID	REQ-FUNC-005
+Title	Discovery chance consumption
+Statement	The system shall maintain a relation record for each (viewer, creator) pair. Initially, discovery_consumed = false. When a viewer takes any consuming action (Subscribe, Next, Mark to read later), the system shall atomically set discovery_consumed = true and record the action_type. Once consumed, that creator shall never appear in that viewer's discovery feed.
+Rationale	Core scarcity mechanic.
+Acceptance Criteria	Relation updated correctly after each consuming action. Discovery feed excludes consumed creators. The consumed record persists across sessions and application restarts.
+Verification	Test
+
+ID	REQ-FUNC-006
+Title	Tag-based discovery browsing
+Statement	The system shall allow authenticated users to browse creators by tag. A tag browse returns creators who have tagged their prime content with that tag AND whose discovery_consumed = false for this viewer.
+Rationale	Tags are the sole discovery mechanism in v0.1.
+Acceptance Criteria	Tag browse returns only creators with matching tags and an unconsumed discovery chance for this viewer.
+Verification	Test
+
+ID	REQ-FUNC-007
+Title	Interruption handling
+Statement	If a discovery card is presented to a viewer but the session ends before any consuming action is taken, the system shall present that same creator's prime content again as the viewer's next discovery card. This re-presentation shall not count as an additional discovery chance; the relation for that (viewer, creator) pair shall remain discovery_consumed = false until a consuming action occurs.
+Rationale	Prevents unintentional loss of a discovery chance due to connectivity loss, app close, or crash.
+Acceptance Criteria	After the session resumes, the same creator's prime content appears as the next discovery card. The relation still shows discovery_consumed = false until the viewer acts.
+Verification	Test
+
+Viewer Actions
+ID	REQ-FUNC-008
+Title	Consuming actions — Next and Subscribe
+Statement	The system shall support Subscribe and Next as consuming actions. Both set discovery_consumed = true and record the respective action_type. Subscribe additionally sets subscribed = true.
+Rationale	Clear action semantics.
+Acceptance Criteria	After 'Next': discovery_consumed = true, action_type = next, subscribed unchanged. After 'Subscribe': discovery_consumed = true, action_type = subscribe, subscribed = true. In both cases the creator disappears from the discovery feed.
+Verification	Test
+
+ID	REQ-FUNC-009
+Title	Consuming action — Mark to read later
+Statement	When a viewer chooses 'Mark to read later', the system shall set discovery_consumed = true, action_type = read_later, and read_later = true. The creator's prime content shall remain retrievable via the Read Later Feed until the viewer explicitly removes it.
+Rationale	Allows postponement without re-exposure.
+Acceptance Criteria	Creator is removed from discovery feed. Creator appears in Read Later Feed. Viewer can later remove the creator from the Read Later Feed.
+Verification	Test
+
+ID	REQ-FUNC-010
+Title	Ancillary action — Like
+Statement	The system shall allow a viewer to like a creator. Liking shall set liked = true in the relation. Liking shall not affect discovery_consumed.
+Rationale	Engagement tracking independent of the discovery mechanic.
+Acceptance Criteria	After liking, liked = true. discovery_consumed remains unchanged. Creator still appears in discovery feed if the chance was not consumed.
+Verification	Test
+
+ID	REQ-FUNC-011
+Title	Ancillary action — View Profile
+Statement	A viewer may visit a creator's profile and browse all works without consuming the discovery chance. Profile visits shall be recorded in the relation for history purposes but shall not change discovery_consumed.
+Rationale	Allows informed decision before committing to a consuming action.
+Acceptance Criteria	After a profile visit, the creator's prime content still appears in the discovery feed (unless a consuming action was taken separately).
+Verification	Test
+
+Subscription
+ID	REQ-FUNC-012
+Title	Subscribe / unsubscribe
+Statement	A viewer may subscribe to a creator after consuming a discovery chance (via the Subscribe action). A subscriber shall have access to the creator's full post feed (Subscribe Feed). A viewer may unsubscribe at any time; unsubscribing sets subscribed = false but does not restore the discovery chance.
+Rationale	Subscription is the conversion event the platform is designed to drive.
+Acceptance Criteria	Subscribing grants access to the creator's feed. Unsubscribing removes that access. Subscription does not re-enable discovery for that creator.
+Verification	Test
+
+Feeds (Derived)
+ID	REQ-FUNC-013
+Title	Discovery Feed
+Statement	The Discovery Feed shall display creators where discovery_consumed = false AND the creator has published prime content AND the creator has not hidden their profile.
+Rationale	Only unseen, active creators appear.
+Acceptance Criteria	Feed matches the derived set exactly. Hidden creator profiles do not appear.
+Verification	Test
+
+ID	REQ-FUNC-014
+Title	Subscribe Feed
+Statement	The Subscribe Feed shall display all works (prime and non-prime) from creators where subscribed = true.
+Rationale	Subscribers need a unified feed of everything from creators they follow.
+Acceptance Criteria	Feed includes all works from subscribed creators. Non-subscribed creators do not appear.
+Verification	Test
+
+ID	REQ-FUNC-015
+Title	Read Later Feed
+Statement	The Read Later Feed shall display the prime content of creators where read_later = true. A viewer may remove a creator from this feed at any time.
+Rationale	Dedicated feed for postponed discovery encounters.
+Acceptance Criteria	Feed includes creators marked read later. Removal works. The creator does not return to the discovery feed after removal.
+Verification	Test
+
+ID	REQ-FUNC-016
+Title	Viewed Authors Feed
+Statement	The Viewed Authors Feed shall display all creators where discovery_consumed = true, with action_type and consumed_at timestamp for each.
+Rationale	Allows viewers to review creators they have already judged — answers the 'find someone I've seen' use case.
+Acceptance Criteria	Feed includes all consumed creators with correct action type and timestamp. Creators appear here regardless of subsequent profile changes by the creator.
+Verification	Test
+
+ID	REQ-FUNC-017
+Title	Liked Authors Feed
+Statement	The Liked Authors Feed shall display creators where liked = true.
+Rationale	Engagement tracking independent of discovery status.
+Acceptance Criteria	Feed includes all liked creators. Liking a creator who has not yet been discovered does not cause them to be excluded from the discovery feed.
+Verification	Test
+
+Search
+ID	REQ-FUNC-018
+Title	Search by creator name / handle
+Statement	The system shall provide a search function allowing any authenticated user to find creators by name or handle. Search results shall not be filtered by discovery_consumed or any relation state; creators who have been seen, subscribed to, or skipped shall still appear.
+Rationale	Provides a direct navigation path and a recovery route for accidental clicks. Directly answers 'find someone I've seen'.
+Acceptance Criteria	Search returns matching creators regardless of relation state. A creator who was marked 'Next' still appears in search results.
+Verification	Test
+
+Tags
+ID	REQ-FUNC-019
+Title	Tag assignment
+Statement	The system shall allow a creator to assign one or more tags to their prime content when publishing or updating it. Tag values are free-form text, case-insensitive, and normalized to lowercase on storage.
+Rationale	Tags are the only discovery mechanism. Normalization prevents fragmentation (e.g., 'Tech' and 'tech' treated as the same tag).
+Acceptance Criteria	Assigned tags surface the creator in the relevant tag browse results. Removing a tag removes the creator from that tag's results. 'Tech' and 'tech' resolve to the same tag.
+Verification	Test
+
+Data Retention
+ID	REQ-FUNC-020
+Title	Data retention guarantee
+Statement	Once a record (user, profile, prime content, work, or relation entry) is created, the system shall never permanently delete or make it unrecoverable. An author may hide their profile from future discovery; doing so shall: (1) remove the author from the Discovery Feed for viewers who have not yet encountered them; (2) prevent new subscriptions; (3) preserve access for existing subscribers and viewers with an existing Read Later or Viewed Authors relation to that author; (4) not destroy the underlying records.
+Rationale	Eternalization and subscriber trust — subscribers should not lose access to content they committed to.
+Acceptance Criteria	(1) Hidden author does not appear in discovery or tag browse. (2) New subscription attempts fail. (3) Existing subscribers still see the author's works in Subscribe Feed. (4) Viewed Authors Feed still shows the author for viewers who judged them.
+Verification	Inspection + Test
+
+Standard Posts
+ID	REQ-FUNC-021
+Title	Standard post feed
+Statement	Any authenticated user may publish text posts to their profile's standard feed. These posts are visible to the creator's subscribers via the Subscribe Feed and to any viewer who visits the profile directly.
+Rationale	Creators need a content channel beyond prime content for ongoing engagement with subscribers.
+Acceptance Criteria	A published post appears on the creator's profile. Subscribers see it in their Subscribe Feed. Non-subscribers who visit the profile directly can also see it.
+Verification	Test
+
+3.3 Quality of Service
+3.3.1 Performance
+ID	REQ-PERF-001
+Title	Discovery feed load time
+Statement	The system shall return discovery feed results within 2 seconds at the 95th percentile under a load of up to 100 concurrent users.
+Rationale	Demo must feel responsive.
+Acceptance Criteria	Load test against a seeded dataset of 500 creators. p95 response time ≤ 2s.
+Verification	Test
+
+ID	REQ-PERF-002
+Title	Storage quota per user
+Statement	The system shall enforce a maximum of 100 MB of stored content per user account.
+Rationale	Cost control and storage predictability.
+Acceptance Criteria	Attempting to upload content that would exceed 100 MB returns an error. Existing content is unaffected.
+Verification	Test
+
+3.3.2 Security
+ID	REQ-SEC-001
+Title	Password storage
+Statement	The system shall store passwords using a modern adaptive hashing algorithm (bcrypt, scrypt, or Argon2). Plaintext passwords shall never be stored or logged.
+Rationale	Basic credential security.
+Acceptance Criteria	Inspection of the data store shows no plaintext passwords. Login succeeds after a hash round-trip.
+Verification	Inspection
+
+ID	REQ-SEC-002
+Title	Discovery chance tamper prevention
+Statement	Discovery chance state shall be enforced server-side. Client-side state shall not be trusted to determine whether a chance has been consumed.
+Rationale	Prevents the core mechanic from being bypassed by client manipulation.
+Acceptance Criteria	Modifying cookies, local storage, or request parameters does not cause a consumed discovery chance to re-appear in browse results.
+Verification	Test
+
+ID	REQ-SEC-003
+Title	Email verification before publishing
+Statement	Unverified user accounts shall not be permitted to publish prime content, create posts, or subscribe to other creators.
+Rationale	Reduces bot account abuse.
+Acceptance Criteria	An unverified account attempting to publish or subscribe receives an error. A verified account proceeds normally.
+Verification	Test
+
+3.3.3 Reliability
+ID	REQ-REL-001
+Title	Discovery chance write durability
+Statement	Once a discovery chance is recorded as consumed, the system shall not lose that record due to application error or restart.
+Rationale	Lost records break the core mechanic.
+Acceptance Criteria	After recording a consuming action and restarting the application, the creator still does not appear in discovery browse for that viewer.
+Verification	Test
+
+ID	REQ-REL-002
+Title	Interruption recovery durability
+Statement	The in-progress discovery card state (creator shown but not yet acted on) shall survive session termination, crash, and reconnection, regardless of whether the same device is used.
+Rationale	Avoids unintentional loss of a discovery chance due to interruptions.
+Acceptance Criteria	After a session ends mid-card and resumes (new tab, new device), the same creator's prime content is presented again as the next discovery card.
+Verification	Test
+
+3.3.4 Availability
+ID	REQ-AVAIL-001
+Title	Uptime target
+Statement	The system shall target 99% uptime during the concept phase (≤ 7.3 hours downtime per month). Planned maintenance windows are excluded.
+Rationale	PoC must be reliably accessible for investor demos.
+Acceptance Criteria	Uptime monitored over a rolling 30-day period. Unplanned downtime ≤ 7.3 hours.
+Verification	Monitoring
+
+3.3.5 Observability
+ID	REQ-OBS-001
+Title	Action logging
+Statement	The system shall log each consuming action (Subscribe, Next, Read Later) with: timestamp, viewer ID, creator ID, action type.
+Rationale	Audit trail for the core mechanic; debugging for the two-person team.
+Acceptance Criteria	Triggering each consuming action produces a log entry with all four fields.
+Verification	Inspection
+
+ID	REQ-OBS-002
+Title	Error logging
+Statement	The system shall log all unhandled server errors with: timestamp, request path, error message.
+Rationale	Two-person team needs to debug demo failures quickly.
+Acceptance Criteria	Triggering a known server error produces a log entry with all three fields.
+Verification	Demonstration
+
+3.4 Compliance
+ID	REQ-COMP-001
+Title	User liability disclaimer
+Statement	The system shall present users with an agreement stating that they are solely responsible for the legality of content they publish; the platform disclaims liability.
+Rationale	Basic legal protection for the platform.
+Acceptance Criteria	Disclaimer is displayed and must be accepted during registration. Agreement text is visible in the UI.
+Verification	Inspection
+
+ID	REQ-COMP-002
+Title	No right to be forgotten — disclosure
+Statement	The system shall inform users during registration that data is retained per the retention guarantee in REQ-FUNC-020, and that existing subscribers retain access to content even if the author hides their profile.
+Rationale	Users must consent to the retention model before joining.
+Acceptance Criteria	Registration flow includes explicit disclosure. Users cannot complete registration without acknowledging it.
+Verification	Inspection
+
+3.5 Design and Implementation
+3.5.1 Installation
+The PoC shall be deployable to a cloud hosting environment via documented steps. A local development environment must be reproducible with a single command or a short, documented sequence. Single-region deployment is sufficient for the PoC.
+
+3.5.2 Build and Delivery
+ID	REQ-BUILD-001
+Title	Reproducible build
+Statement	Source code shall be maintained in a single repository. Build artifacts shall be versioned. Manual deployment is acceptable; CI/CD is not required for v0.1.
+Rationale	Two-person team needs reproducibility without overhead.
+Acceptance Criteria	A developer can clone the repository and produce a working build using only the documented steps.
+Verification	Inspection
+
+3.5.3 Distribution
+Single-region deployment is sufficient for the concept phase. No multi-region or geo-redundancy is required.
+
+3.5.4 Maintainability
+ID	REQ-MAINT-001
+Title	Modular code structure
+Statement	Code shall separate UI, business logic, and data storage into distinct layers. Both developers shall be able to read and modify any layer without requiring documentation lookups.
+Rationale	Two-person team must sustain velocity across the codebase.
+Acceptance Criteria	Code review confirms separation of layers. No cross-layer coupling for core logic.
+Verification	Inspection
+
+3.5.7 Cost
+ID	REQ-COST-001
+Title	Monthly cost ceiling
+Statement	Monthly operating costs (hosting, storage, email verification service, object storage) shall remain within free tiers or under $50 USD during the concept phase.
+Rationale	PoC is self-funded; cost must be controlled.
+Acceptance Criteria	Monthly invoice for all services totals ≤ $50 USD.
+Verification	Analysis
+
+3.5.8 Deadline
+Target: investor-demo-ready build within the team's agreed sprint. Specific date to be recorded in the Revision History when confirmed.
+
+3.5.9 Proof of Concept — Success Criteria
+ID	REQ-POC-001
+Title	End-to-end demo
+Statement	The PoC shall demonstrate the following flow in a live browser session: (1) a viewer browses by tag and sees a creator's prime content; (2) the viewer takes a consuming action; (3) the creator no longer appears in tag browse for that viewer; (4) the viewer finds the creator via search or Viewed Authors Feed; (5) subscription grants access to the creator's post feed.
+Rationale	This is the core investor demo scenario.
+Acceptance Criteria	All five steps complete successfully without errors in a live demo session.
+Verification	Demonstration
+
+3.5.10 Change Management
+ID	REQ-CM-001
+Title	Requirement change tracking
+Statement	Changes to requirements shall be recorded in the Revision History table with author, date, description, and version increment. Breaking changes to the relation schema require review by both developers.
+Rationale	Traceability for a two-person team.
+Acceptance Criteria	Any changed requirement has a corresponding Revision History entry.
+Verification	Inspection
+
+4. Verification
+Requirement ID	Title	Verification Method	Status
+REQ-INT-001	Responsive layout	Demonstration	Planned
+REQ-INT-002	Discovery card presentation	Demonstration	Planned
+REQ-INT-003	Discovery gate in UI	Test	Planned
+REQ-INT-004	Image object storage	Inspection	Planned
+REQ-INT-005	Email verification service	Test	Planned
+REQ-FUNC-001	Registration	Test	Planned
+REQ-FUNC-002	Login / logout	Test	Planned
+REQ-FUNC-003	Prime content creation	Test	Planned
+REQ-FUNC-004	Prime content update	Test	Planned
+REQ-FUNC-005	Discovery chance consumption	Test	Planned
+REQ-FUNC-006	Tag-based discovery browsing	Test	Planned
+REQ-FUNC-007	Interruption handling	Test	Planned
+REQ-FUNC-008	Consuming actions — Next and Subscribe	Test	Planned
+REQ-FUNC-009	Consuming action — Mark to read later	Test	Planned
+REQ-FUNC-010	Ancillary action — Like	Test	Planned
+REQ-FUNC-011	Ancillary action — View Profile	Test	Planned
+REQ-FUNC-012	Subscribe / unsubscribe	Test	Planned
+REQ-FUNC-013	Discovery Feed	Test	Planned
+REQ-FUNC-014	Subscribe Feed	Test	Planned
+REQ-FUNC-015	Read Later Feed	Test	Planned
+REQ-FUNC-016	Viewed Authors Feed	Test	Planned
+REQ-FUNC-017	Liked Authors Feed	Test	Planned
+REQ-FUNC-018	Search	Test	Planned
+REQ-FUNC-019	Tag assignment	Test	Planned
+REQ-FUNC-020	Data retention guarantee	Inspection + Test	Planned
+REQ-FUNC-021	Standard post feed	Test	Planned
+REQ-PERF-001	Discovery feed load time	Test	Planned
+REQ-PERF-002	Storage quota per user	Test	Planned
+REQ-SEC-001	Password storage	Inspection	Planned
+REQ-SEC-002	Discovery chance tamper prevention	Test	Planned
+REQ-SEC-003	Email verification before publishing	Test	Planned
+REQ-REL-001	Discovery chance write durability	Test	Planned
+REQ-REL-002	Interruption recovery durability	Test	Planned
+REQ-AVAIL-001	Uptime target	Monitoring	Planned
+REQ-OBS-001	Action logging	Inspection	Planned
+REQ-OBS-002	Error logging	Demonstration	Planned
+REQ-COMP-001	User liability disclaimer	Inspection	Planned
+REQ-COMP-002	No right to be forgotten — disclosure	Inspection	Planned
+REQ-BUILD-001	Reproducible build	Inspection	Planned
+REQ-MAINT-001	Modular code structure	Inspection	Planned
+REQ-COST-001	Monthly cost ceiling	Analysis	Planned
+REQ-POC-001	End-to-end demo	Demonstration	Planned
+REQ-CM-001	Requirement change tracking	Inspection	Planned
+
+5. Appendixes
+Appendix A: Informative Data Model Example (Non-Normative)
+The following illustrates one possible representation of the relation model. Implementation details are design decisions.
+
+User
+•	email (verified)
+•	ip_address (optional, recorded at registration)
+•	password_hash
+•	created_at
+
+AuthorProfile
+•	user reference
+•	prime_content_type: text_or_link | image_set
+•	prime content payload (text/link, or up to 4 images with names)
+•	hidden: boolean (default false)
+•	tags: list of normalized strings
+
+Work
+•	author reference
+•	content (text)
+•	created_at
+
+ViewerAuthorRelation
+•	viewer reference
+•	author reference
+•	discovery_consumed: boolean
+•	pending_card: boolean (true = card shown but no action taken yet)
+•	action_type: subscribe | next | read_later | none
+•	subscribed: boolean
+•	read_later: boolean
+•	liked: boolean
+•	consumed_at: timestamp
+•	updated_at: timestamp
+
+Appendix B: Derived Feeds Definition (Normative)
+Let R(viewer, author) be the logical relation described in REQ-FUNC-005 and REQ-FUNC-011. Then:
+
+Feed	Derivation
+DiscoveryFeed(viewer)	{ author | R.discovery_consumed = false AND author has published prime content AND author.hidden = false }
+SubscribeFeed(viewer)	{ all works of author | R.subscribed = true }
+ReadLaterFeed(viewer)	{ (author, prime_content) | R.read_later = true }
+ViewedAuthorsFeed(viewer)	{ (author, R.action_type, R.consumed_at) | R.discovery_consumed = true }
+LikedAuthorsFeed(viewer)	{ author | R.liked = true }
+SearchResults(query)	{ author | author.name or author.handle matches query } — independent of R (per REQ-FUNC-018)
+
+End of SRS Version 1.0
