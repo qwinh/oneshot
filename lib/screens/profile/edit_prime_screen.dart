@@ -1,9 +1,9 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../../models/prime_content.dart';
-import '../../../services/content_service.dart';
-import '../../../services/storage_service.dart';
+import '../../models/prime_content.dart';
+import '../../services/content_service.dart';
+import '../../services/storage_service.dart';
 
 class EditPrimeScreen extends StatefulWidget {
   const EditPrimeScreen({super.key});
@@ -27,6 +27,9 @@ class _EditPrimeScreenState extends State<EditPrimeScreen> {
   bool _isLoading = false;
   bool _isUploading = false;
   String? _errorMessage;
+
+  // State preservation to prevent overwriting original creation date
+  DateTime? _existingCreatedAt;
 
   @override
   void initState() {
@@ -57,6 +60,8 @@ class _EditPrimeScreenState extends State<EditPrimeScreen> {
         _textController.text = profile.textPayload ?? '';
         _imageUrls = List.from(profile.imageUrls);
         _tagsController.text = profile.tags.join(', ');
+        // Safely cache original document creation date
+        _existingCreatedAt = profile.createdAt;
       }
     } catch (e) {
       _errorMessage = 'Failed to load profile data.';
@@ -216,7 +221,8 @@ class _EditPrimeScreenState extends State<EditPrimeScreen> {
       imageUrls: _contentType == PrimeContentType.imageSet ? _imageUrls : [],
       tags: parsedTags,
       hidden: false,
-      createdAt: DateTime.now(),
+      // Preserves original creation date, fall back to now only if first-time save
+      createdAt: _existingCreatedAt ?? DateTime.now(),
     );
 
     try {
