@@ -3,6 +3,21 @@ import '../models/prime_content.dart';
 import '../models/relation.dart';
 import '../models/work.dart';
 
+/// A single row of the Viewed Authors Feed (REQ-FUNC-016): the author's
+/// profile paired with the action that closed out their discovery chance
+/// and when it happened.
+class ViewedAuthorResult {
+  final AuthorProfile profile;
+  final ActionType actionType;
+  final DateTime? consumedAt;
+
+  const ViewedAuthorResult({
+    required this.profile,
+    required this.actionType,
+    this.consumedAt,
+  });
+}
+
 class DiscoveryService {
   final FirebaseFirestore _db;
 
@@ -146,8 +161,12 @@ class DiscoveryService {
     return profiles;
   }
 
-  /// REQ-FUNC-016: Viewed Authors History Feed
-  Future<List<AuthorProfile>> getViewedAuthorsFeed(String viewerId) async {
+  /// REQ-FUNC-016: Viewed Authors History Feed.
+  /// Must surface action_type and consumed_at per creator, not just the bare
+  /// profile, so the viewer can see *how* and *when* each chance was used.
+  Future<List<ViewedAuthorResult>> getViewedAuthorsFeed(
+    String viewerId,
+  ) async {
     final relationsSnap = await _db
         .collection('relations')
         .where('viewerId', isEqualTo: viewerId)
@@ -156,13 +175,32 @@ class DiscoveryService {
 
     if (relationsSnap.docs.isEmpty) return [];
 
-    final List<AuthorProfile> profiles = [];
+    final List<ViewedAuthorResult> results = [];
     for (var doc in relationsSnap.docs) {
-      final authorId = doc.data()['authorId'] as String;
+      final data = doc.data();
+      final authorId = data['authorId'] as String;
       final profile = await getAuthorProfile(authorId);
-      if (profile != null) profiles.add(profile);
+      if (profile == null) continue;
+      results.add(
+        ViewedAuthorResult(
+          profile: profile,
+          actionType: ActionTypeExtension.fromString(
+            data['action_type'] as String?,
+          ),
+          consumedAt: data['consumed_at'] != null
+              ? (data['consumed_at'] as Timestamp).toDate()
+              : null,
+        ),
+      );
     }
-    return profiles;
+
+    // Most recently judged creators first.
+    results.sort((a, b) {
+      if (a.consumedAt == null) return 1;
+      if (b.consumedAt == null) return -1;
+      return b.consumedAt!.compareTo(a.consumedAt!);
+    });
+    return results;
   }
 
   /// REQ-FUNC-017: Liked Authors Feed
@@ -216,6 +254,23 @@ class DiscoveryService {
     }
 
     return results.where((p) => !p.hidden).toList();
+  }
+
+  /// REQ-FUNC-021: Standard post feed for a single author's profile.
+  /// Visible to subscribers (via Subscribe Feed) and to any viewer who
+  /// visits the profile directly — this powers the latter case.
+  Future<List<Work>> getAuthorWorks(String authorId) async {
+    final worksSnap = await _db
+        .collection('works')
+        .where('authorId', isEqualTo: authorId)
+        .get();
+
+    final List<Work> works = worksSnap.docs
+        .map((doc) => Work.fromMap(doc.id, doc.data()))
+        .toList();
+
+    works.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+    return works;
   }
 
   /// Publishes a regular content Update (Work) to the system.

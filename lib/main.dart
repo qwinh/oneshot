@@ -4,6 +4,12 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:oneshot/services/auth_service.dart';
 import 'package:oneshot/screens/auth/login_screen.dart';
 import 'package:oneshot/screens/profile/edit_prime_screen.dart';
+import 'package:oneshot/screens/discovery/discovery_screen.dart';
+import 'package:oneshot/screens/search/search_screen.dart';
+import 'package:oneshot/screens/feeds/subscribe_feed_screen.dart';
+import 'package:oneshot/screens/feeds/read_later_screen.dart';
+import 'package:oneshot/screens/feeds/viewed_authors_screen.dart';
+import 'package:oneshot/screens/feeds/liked_authors_screen.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -22,7 +28,7 @@ class OneShotApp extends StatelessWidget {
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
         primaryColor: Colors.white,
-        scaffoldBackgroundColor: Colors.grey[955],
+        scaffoldBackgroundColor: Colors.grey[950],
       ),
       home: const AuthGateRouter(),
     );
@@ -233,89 +239,120 @@ class _EmailVerificationGateScreenState
   }
 }
 
-/// Dynamic Home Screen routing users to configure discovery options
-class MockAuthenticatedHomeScreen extends StatelessWidget {
+/// Primary navigation shell once a user is authenticated and verified.
+/// Ties together Discovery, Search, and the four derived feeds via bottom
+/// navigation, with Edit Prime and Sign Out reachable from the app bar.
+/// Without this shell the individual screens (already built) are unreachable
+/// from a live demo session.
+class MockAuthenticatedHomeScreen extends StatefulWidget {
   const MockAuthenticatedHomeScreen({super.key});
+
+  @override
+  State<MockAuthenticatedHomeScreen> createState() =>
+      _MockAuthenticatedHomeScreenState();
+}
+
+class _MockAuthenticatedHomeScreenState
+    extends State<MockAuthenticatedHomeScreen> {
+  int _tabIndex = 0;
+
+  static const List<Widget> _tabs = [
+    DiscoveryScreen(),
+    SearchScreen(),
+    SubscribeFeedScreen(),
+    ReadLaterScreen(),
+    ViewedAuthorsScreen(),
+    LikedAuthorsScreen(),
+  ];
+
+  static const List<String> _tabLabels = [
+    'Discovery',
+    'Search',
+    'Subscribe Feed',
+    'Read Later',
+    'Viewed Authors',
+    'Liked Authors',
+  ];
+
+  static const List<IconData> _tabIcons = [
+    Icons.style_outlined,
+    Icons.search,
+    Icons.rss_feed,
+    Icons.bookmark_outline,
+    Icons.history,
+    Icons.favorite_border,
+  ];
 
   @override
   Widget build(BuildContext context) {
     final AuthService authService = AuthService();
-    final String currentUserId = authService.currentUser?.uid ?? '';
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('OneShot Dashboard'),
+        title: Text(_tabLabels[_tabIndex]),
         actions: [
           IconButton(
             icon: const Icon(Icons.logout),
+            tooltip: 'Sign out',
             onPressed: () => authService.logout(),
           ),
         ],
       ),
-      body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(24.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
+      drawer: Drawer(
+        backgroundColor: Colors.grey[950],
+        child: SafeArea(
+          child: ListView(
+            padding: EdgeInsets.zero,
             children: [
-              const Icon(
-                Icons.account_circle_outlined,
-                size: 70,
-                color: Colors.white70,
-              ),
-              const SizedBox(height: 16),
-              Text(
-                'Welcome to OneShot',
-                style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
+              const DrawerHeader(
+                child: Text(
+                  'ONESHOT',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
+                    letterSpacing: 2,
+                  ),
                 ),
               ),
-              const SizedBox(height: 8),
-              Text(
-                'Author UID: $currentUserId',
-                style: const TextStyle(
-                  fontFamily: 'monospace',
-                  color: Colors.grey,
+              for (int i = 0; i < _tabLabels.length; i++)
+                ListTile(
+                  leading: Icon(_tabIcons[i], color: Colors.white70),
+                  title: Text(_tabLabels[i]),
+                  selected: _tabIndex == i,
+                  onTap: () {
+                    setState(() => _tabIndex = i);
+                    Navigator.of(context).pop();
+                  },
                 ),
-                textAlign: TextAlign.center,
-              ),
-              const SizedBox(height: 40),
-
-              // Setup Prime Content Button
-              ElevatedButton.icon(
-                onPressed: () {
+              const Divider(color: Colors.white10),
+              ListTile(
+                leading: const Icon(Icons.edit_note, color: Colors.white70),
+                title: const Text('Configure Discovery Prime'),
+                onTap: () {
+                  Navigator.of(context).pop();
                   Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const EditPrimeScreen()),
+                    MaterialPageRoute(
+                      builder: (_) => const EditPrimeScreen(),
+                    ),
                   );
                 },
-                icon: const Icon(Icons.edit_note, color: Colors.black),
-                label: const Text('Configure Discovery Prime'),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.white,
-                  foregroundColor: Colors.black,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 24,
-                    vertical: 16,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 24),
-              Text(
-                'Setting up your Discovery Prime allows other users to search your tags and discover your single piece of premium scarcity content.',
-                style: TextStyle(
-                  color: Colors.grey[500],
-                  fontSize: 13,
-                  height: 1.4,
-                ),
-                textAlign: TextAlign.center,
               ),
             ],
           ),
         ),
+      ),
+      body: IndexedStack(index: _tabIndex, children: _tabs),
+      bottomNavigationBar: NavigationBar(
+        selectedIndex: _tabIndex,
+        onDestinationSelected: (i) => setState(() => _tabIndex = i),
+        destinations: [
+          for (int i = 0; i < _tabLabels.length; i++)
+            NavigationDestination(
+              icon: Icon(_tabIcons[i]),
+              label: _tabLabels[i],
+            ),
+        ],
       ),
     );
   }

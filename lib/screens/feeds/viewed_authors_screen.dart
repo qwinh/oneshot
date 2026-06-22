@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../models/prime_content.dart';
+import '../../models/relation.dart';
 import '../../services/discovery_service.dart';
+import '../profile/profile_screen.dart';
 
 class ViewedAuthorsScreen extends StatefulWidget {
   const ViewedAuthorsScreen({super.key});
@@ -13,7 +14,7 @@ class ViewedAuthorsScreen extends StatefulWidget {
 class _ViewedAuthorsScreenState extends State<ViewedAuthorsScreen> {
   final DiscoveryService _discoveryService = DiscoveryService();
 
-  List<AuthorProfile> _history = [];
+  List<ViewedAuthorResult> _history = [];
   bool _isLoading = false;
 
   @override
@@ -41,6 +42,37 @@ class _ViewedAuthorsScreenState extends State<ViewedAuthorsScreen> {
     }
   }
 
+  String _actionLabel(ActionType action) {
+    switch (action) {
+      case ActionType.subscribe:
+        return 'Subscribed';
+      case ActionType.next:
+        return 'Skipped (Next)';
+      case ActionType.readLater:
+        return 'Read Later';
+      case ActionType.none:
+        return 'Unresolved';
+    }
+  }
+
+  IconData _actionIcon(ActionType action) {
+    switch (action) {
+      case ActionType.subscribe:
+        return Icons.rss_feed;
+      case ActionType.next:
+        return Icons.skip_next;
+      case ActionType.readLater:
+        return Icons.bookmark;
+      case ActionType.none:
+        return Icons.history;
+    }
+  }
+
+  String _formatTimestamp(DateTime? dt) {
+    if (dt == null) return '';
+    return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')}';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -57,7 +89,8 @@ class _ViewedAuthorsScreenState extends State<ViewedAuthorsScreen> {
               padding: const EdgeInsets.all(16),
               itemCount: _history.length,
               itemBuilder: (context, index) {
-                final profile = _history[index];
+                final entry = _history[index];
+                final profile = entry.profile;
                 return Card(
                   color: Colors.grey[900],
                   margin: const EdgeInsets.only(bottom: 10),
@@ -65,10 +98,15 @@ class _ViewedAuthorsScreenState extends State<ViewedAuthorsScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: ListTile(
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => ProfileScreen(authorId: profile.uid),
+                      ),
+                    ),
                     leading: CircleAvatar(
                       backgroundColor: Colors.grey[800],
-                      child: const Icon(
-                        Icons.history,
+                      child: Icon(
+                        _actionIcon(entry.actionType),
                         color: Colors.white70,
                         size: 20,
                       ),
@@ -78,7 +116,8 @@ class _ViewedAuthorsScreenState extends State<ViewedAuthorsScreen> {
                       style: const TextStyle(fontWeight: FontWeight.bold),
                     ),
                     subtitle: Text(
-                      '@${profile.handle}',
+                      '@${profile.handle} · ${_actionLabel(entry.actionType)}'
+                      '${entry.consumedAt != null ? ' · ${_formatTimestamp(entry.consumedAt)}' : ''}',
                       style: const TextStyle(color: Colors.grey),
                     ),
                     trailing: const Icon(

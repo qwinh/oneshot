@@ -23,7 +23,7 @@ class _EditPrimeScreenState extends State<EditPrimeScreen> {
   final TextEditingController _tagsController = TextEditingController();
 
   PrimeContentType _contentType = PrimeContentType.text;
-  List<String> _imageUrls = [];
+  List<PrimeImage> _images = [];
   bool _isLoading = false;
   bool _isUploading = false;
   String? _errorMessage;
@@ -58,7 +58,7 @@ class _EditPrimeScreenState extends State<EditPrimeScreen> {
         _nameController.text = profile.displayName;
         _contentType = profile.primeContentType;
         _textController.text = profile.textPayload ?? '';
-        _imageUrls = List.from(profile.imageUrls);
+        _images = List.from(profile.images);
         _tagsController.text = profile.tags.join(', ');
         // Safely cache original document creation date
         _existingCreatedAt = profile.createdAt;
@@ -73,7 +73,7 @@ class _EditPrimeScreenState extends State<EditPrimeScreen> {
   /// Simulation utility that generates a solid block color JPG/PNG representation to
   /// test Firebase Storage upload rules instantly without needing an external File Picker package.
   Future<void> _simulateImageUpload() async {
-    if (_imageUrls.length >= 4) {
+    if (_images.length >= 4) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
           content: Text('Scarcity rule: Maximum 4 discovery images allowed.'),
@@ -170,7 +170,9 @@ class _EditPrimeScreenState extends State<EditPrimeScreen> {
       );
 
       setState(() {
-        _imageUrls.add(uploadedUrl);
+        _images.add(
+          PrimeImage(url: uploadedUrl, name: 'Image ${_images.length + 1}'),
+        );
       });
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -182,18 +184,25 @@ class _EditPrimeScreenState extends State<EditPrimeScreen> {
   }
 
   void _removeUploadedImage(int index) async {
-    final String url = _imageUrls[index];
+    final String url = _images[index].url;
     setState(() {
-      _imageUrls.removeAt(index);
+      _images.removeAt(index);
     });
     // Fire-and-forget deletion from active bucket
     await _storageService.deleteImageByUrl(url);
   }
 
+  /// REQ-FUNC-003: each image in the set has an associated name.
+  void _renameImage(int index, String newName) {
+    setState(() {
+      _images[index] = _images[index].copyWith(name: newName);
+    });
+  }
+
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
 
-    if (_contentType == PrimeContentType.imageSet && _imageUrls.isEmpty) {
+    if (_contentType == PrimeContentType.imageSet && _images.isEmpty) {
       setState(() => _errorMessage = 'Please upload at least one image.');
       return;
     }
@@ -218,7 +227,7 @@ class _EditPrimeScreenState extends State<EditPrimeScreen> {
       textPayload: _contentType == PrimeContentType.text
           ? _textController.text.trim()
           : null,
-      imageUrls: _contentType == PrimeContentType.imageSet ? _imageUrls : [],
+      images: _contentType == PrimeContentType.imageSet ? _images : [],
       tags: parsedTags,
       hidden: false,
       // Preserves original creation date, fall back to now only if first-time save
@@ -379,7 +388,7 @@ class _EditPrimeScreenState extends State<EditPrimeScreen> {
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
                                 Text(
-                                  'Prime Image Gallery (${_imageUrls.length}/4)',
+                                  'Prime Image Gallery (${_images.length}/4)',
                                   style: const TextStyle(
                                     fontWeight: FontWeight.bold,
                                   ),
@@ -393,7 +402,7 @@ class _EditPrimeScreenState extends State<EditPrimeScreen> {
                                       color: Colors.white,
                                     ),
                                   )
-                                else if (_imageUrls.length < 4)
+                                else if (_images.length < 4)
                                   TextButton.icon(
                                     onPressed: _simulateImageUpload,
                                     icon: const Icon(
@@ -405,7 +414,7 @@ class _EditPrimeScreenState extends State<EditPrimeScreen> {
                               ],
                             ),
                             const SizedBox(height: 12),
-                            if (_imageUrls.isEmpty)
+                            if (_images.isEmpty)
                               const Text(
                                 'No images uploaded yet. Simulating adds a sample asset to cloud storage.',
                                 style: TextStyle(
@@ -422,50 +431,84 @@ class _EditPrimeScreenState extends State<EditPrimeScreen> {
                                       crossAxisCount: 2,
                                       crossAxisSpacing: 10,
                                       mainAxisSpacing: 10,
-                                      childAspectRatio: 1.2,
+                                      childAspectRatio: 0.85,
                                     ),
-                                itemCount: _imageUrls.length,
+                                itemCount: _images.length,
                                 itemBuilder: (context, idx) {
-                                  return Stack(
+                                  return Column(
+                                    crossAxisAlignment: CrossAxisAlignment.stretch,
                                     children: [
-                                      Positioned.fill(
-                                        child: ClipRRect(
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                          child: Image.network(
-                                            _imageUrls[idx],
-                                            fit: BoxFit.cover,
-                                            errorBuilder:
-                                                (context, error, stackTrace) {
-                                                  return Container(
-                                                    color: Colors.blueGrey[800],
-                                                    child: const Icon(
-                                                      Icons.broken_image,
-                                                      color: Colors.white,
-                                                    ),
-                                                  );
-                                                },
-                                          ),
+                                      Expanded(
+                                        child: Stack(
+                                          children: [
+                                            Positioned.fill(
+                                              child: ClipRRect(
+                                                borderRadius:
+                                                    BorderRadius.circular(8),
+                                                child: Image.network(
+                                                  _images[idx].url,
+                                                  fit: BoxFit.cover,
+                                                  errorBuilder:
+                                                      (
+                                                        context,
+                                                        error,
+                                                        stackTrace,
+                                                      ) {
+                                                        return Container(
+                                                          color: Colors
+                                                              .blueGrey[800],
+                                                          child: const Icon(
+                                                            Icons.broken_image,
+                                                            color:
+                                                                Colors.white,
+                                                          ),
+                                                        );
+                                                      },
+                                                ),
+                                              ),
+                                            ),
+                                            Positioned(
+                                              right: 4,
+                                              top: 4,
+                                              child: CircleAvatar(
+                                                radius: 14,
+                                                backgroundColor: Colors.black
+                                                    .withOpacity(0.7),
+                                                child: IconButton(
+                                                  icon: const Icon(
+                                                    Icons.close,
+                                                    size: 12,
+                                                    color: Colors.white,
+                                                  ),
+                                                  onPressed: () =>
+                                                      _removeUploadedImage(
+                                                        idx,
+                                                      ),
+                                                ),
+                                              ),
+                                            ),
+                                          ],
                                         ),
                                       ),
-                                      Positioned(
-                                        right: 4,
-                                        top: 4,
-                                        child: CircleAvatar(
-                                          radius: 14,
-                                          backgroundColor: Colors.black
-                                              .withOpacity(0.7),
-                                          child: IconButton(
-                                            icon: const Icon(
-                                              Icons.close,
-                                              size: 12,
-                                              color: Colors.white,
-                                            ),
-                                            onPressed: () =>
-                                                _removeUploadedImage(idx),
+                                      const SizedBox(height: 4),
+                                      // REQ-FUNC-003: each image carries an associated name.
+                                      TextFormField(
+                                        key: ValueKey(
+                                          'image_name_${idx}_${_images[idx].url}',
+                                        ),
+                                        initialValue: _images[idx].name,
+                                        style: const TextStyle(fontSize: 12),
+                                        decoration: const InputDecoration(
+                                          isDense: true,
+                                          hintText: 'Image name',
+                                          border: OutlineInputBorder(),
+                                          contentPadding: EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 8,
                                           ),
                                         ),
+                                        onChanged: (val) =>
+                                            _renameImage(idx, val),
                                       ),
                                     ],
                                   );

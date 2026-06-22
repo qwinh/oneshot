@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../models/relation.dart';
 
 class ActionButtons extends StatelessWidget {
   final bool isLiked;

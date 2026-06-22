@@ -3,6 +3,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/prime_content.dart';
 import '../../services/discovery_service.dart';
 import '../discovery/prime_card.dart';
+import '../profile/profile_screen.dart';
 
 class ReadLaterScreen extends StatefulWidget {
   const ReadLaterScreen({super.key});
@@ -58,7 +59,30 @@ class _ReadLaterScreenState extends State<ReadLaterScreen> {
                 color: Colors.black,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
-              child: PrimeCard(profile: profile),
+              child: Column(
+                children: [
+                  Expanded(child: PrimeCard(profile: profile)),
+                  SafeArea(
+                    top: false,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: TextButton.icon(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) =>
+                                  ProfileScreen(authorId: profile.uid),
+                            ),
+                          );
+                        },
+                        icon: const Icon(Icons.person_outline),
+                        label: const Text('View Full Profile'),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
             );
           },
         );

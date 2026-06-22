@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/prime_content.dart';
+import '../../widgets/image_grid.dart';
 
 class PrimeCard extends StatelessWidget {
   final AuthorProfile profile;
@@ -104,8 +105,7 @@ class PrimeCard extends StatelessWidget {
   }
 
   Widget _buildImageSetGrid() {
-    final int count = profile.imageUrls.length;
-    if (count == 0) return const SizedBox.shrink();
+    if (profile.images.isEmpty) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -119,35 +119,7 @@ class PrimeCard extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: count == 1 ? 1 : 2,
-            crossAxisSpacing: 8,
-            mainAxisSpacing: 8,
-            childAspectRatio: count == 1 ? 1.4 : 1,
-          ),
-          itemCount: count,
-          itemBuilder: (context, index) {
-            return ClipRRect(
-              borderRadius: BorderRadius.circular(8),
-              child: Image.network(
-                profile.imageUrls[index],
-                fit: BoxFit.cover,
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    color: Colors.grey[850],
-                    child: const Icon(
-                      Icons.broken_image,
-                      color: Colors.white24,
-                    ),
-                  );
-                },
-              ),
-            );
-          },
-        ),
+        ImageGrid(images: profile.images),
       ],
     );
   }

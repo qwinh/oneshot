@@ -45,6 +45,7 @@ class ViewerAuthorRelation {
   final bool liked;
   final DateTime? consumedAt;
   final DateTime? updatedAt;
+  final DateTime? profileVisitedAt;
 
   ViewerAuthorRelation({
     required this.viewerId,
@@ -57,6 +58,7 @@ class ViewerAuthorRelation {
     this.liked = false,
     this.consumedAt,
     this.updatedAt,
+    this.profileVisitedAt,
   });
 
   /// Computes the deterministic Firestore Document ID for this relation row.
@@ -74,6 +76,7 @@ class ViewerAuthorRelation {
     bool? liked,
     DateTime? consumedAt,
     DateTime? updatedAt,
+    DateTime? profileVisitedAt,
   }) {
     return ViewerAuthorRelation(
       viewerId: viewerId ?? this.viewerId,
@@ -86,6 +89,7 @@ class ViewerAuthorRelation {
       liked: liked ?? this.liked,
       consumedAt: consumedAt ?? this.consumedAt,
       updatedAt: updatedAt ?? this.updatedAt,
+      profileVisitedAt: profileVisitedAt ?? this.profileVisitedAt,
     );
   }
 
@@ -105,6 +109,9 @@ class ViewerAuthorRelation {
           : null,
       updatedAt: map['updated_at'] != null
           ? (map['updated_at'] as Timestamp).toDate()
+          : null,
+      profileVisitedAt: map['profile_visited_at'] != null
+          ? (map['profile_visited_at'] as Timestamp).toDate()
           : null,
     );
   }
@@ -126,6 +133,9 @@ class ViewerAuthorRelation {
       'updated_at': updatedAt != null
           ? Timestamp.fromDate(updatedAt!)
           : FieldValue.serverTimestamp(),
+      'profile_visited_at': profileVisitedAt != null
+          ? Timestamp.fromDate(profileVisitedAt!)
+          : null,
     };
   }
 }

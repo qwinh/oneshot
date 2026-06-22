@@ -6,7 +6,8 @@ import '../../services/discovery_service.dart';
 import '../../services/relation_service.dart';
 import '../../widgets/action_buttons.dart';
 import 'prime_card.dart';
-v
+import '../profile/profile_screen.dart';
+
 class DiscoveryScreen extends StatefulWidget {
   const DiscoveryScreen({super.key});
 
@@ -185,9 +186,21 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     });
   }
 
-  void _triggerProfileView() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(content: Text('Profile visited (Ancillary Action - discovery preserved)')),
+  /// REQ-FUNC-011 / REQ-INT-002: Viewing the profile from the discovery card
+  /// is recorded for history but must NEVER consume the discovery chance.
+  Future<void> _triggerProfileView() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null || _currentIndex >= _candidates.length) return;
+
+    final creator = _candidates[_currentIndex];
+    await _relationService.recordProfileVisit(
+      viewerId: user.uid,
+      authorId: creator.uid,
+    );
+
+    if (!mounted) return;
+    await Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => ProfileScreen(authorId: creator.uid)),
     );
   }
 

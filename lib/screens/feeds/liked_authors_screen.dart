@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/prime_content.dart';
 import '../../services/discovery_service.dart';
+import '../profile/profile_screen.dart';
 
 class LikedAuthorsScreen extends StatefulWidget {
   const LikedAuthorsScreen({super.key});
@@ -65,6 +66,11 @@ class _LikedAuthorsScreenState extends State<LikedAuthorsScreen> {
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: ListTile(
+                    onTap: () => Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => ProfileScreen(authorId: profile.uid),
+                      ),
+                    ),
                     leading: CircleAvatar(
                       backgroundColor: Colors.grey[800],
                       child: const Icon(

@@ -155,6 +155,41 @@ class RelationService {
     }, SetOptions(merge: true));
   }
 
+  /// REQ-FUNC-011: records that a viewer visited an author's profile, purely
+  /// for history purposes. This must NEVER touch discovery_consumed —
+  /// browsing a profile is an ancillary action, not a consuming one.
+  Future<void> recordProfileVisit({
+    required String viewerId,
+    required String authorId,
+  }) async {
+    final String docId = '${viewerId}_$authorId';
+    await _relationsCollection.doc(docId).set({
+      'viewerId': viewerId,
+      'authorId': authorId,
+      'profile_visited_at': FieldValue.serverTimestamp(),
+      'updated_at': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
+  /// REQ-FUNC-012: a viewer may subscribe/unsubscribe at any time (e.g. from
+  /// a profile reached via Search or the Viewed/Liked feeds), independent of
+  /// the discovery mechanic. This intentionally does NOT touch
+  /// discovery_consumed — that field is only ever set by resolvePendingCard.
+  /// Unsubscribing does not restore a previously consumed discovery chance.
+  Future<void> setSubscribedStatus({
+    required String viewerId,
+    required String authorId,
+    required bool subscribed,
+  }) async {
+    final String docId = '${viewerId}_$authorId';
+    await _relationsCollection.doc(docId).set({
+      'viewerId': viewerId,
+      'authorId': authorId,
+      'subscribed': subscribed,
+      'updated_at': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
   /// Streams relationship changes dynamically for state-rebuilding reactive contexts.
   Stream<ViewerAuthorRelation?> streamRelation(
     String viewerId,

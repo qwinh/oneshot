@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import '../models/user_model.dart';
 
 class AuthService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -36,12 +37,9 @@ class AuthService {
       // Send the initial verification email automatically
       await user.sendEmailVerification();
 
-      // Write user profile matching the Schema structure (email, isVerified placeholder, ip_address, created_at)
-      await _db.collection('users').doc(user.uid).set({
-        'email': email,
-        'created_at': FieldValue.serverTimestamp(),
-        'ip_address': ipAddress ?? '0.0.0.0', // Recorded at registration
-      });
+      // Write user profile matching the Schema structure (email, ip_address, created_at)
+      final UserModel newUser = UserModel(uid: user.uid, email: email, ipAddress: ipAddress ?? '0.0.0.0');
+      await _db.collection('users').doc(user.uid).set(newUser.toMap());
     }
 
     return credential;

@@ -18,6 +18,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
       TextEditingController();
 
   bool _isLoading = false;
+  bool _agreedToTerms = false;
   String? _errorMessage;
 
   @override
@@ -30,6 +31,14 @@ class _RegisterScreenState extends State<RegisterScreen> {
 
   Future<void> _handleRegister() async {
     if (!_formKey.currentState!.validate()) return;
+
+    if (!_agreedToTerms) {
+      setState(() {
+        _errorMessage =
+            'You must acknowledge the agreement below before registering.';
+      });
+      return;
+    }
 
     setState(() {
       _isLoading = true;
@@ -174,8 +183,8 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   validator: (val) {
                     if (val == null || val.isEmpty)
                       return 'Password is required';
-                    if (val.length < 6)
-                      return 'Password must be at least 6 characters';
+                    if (val.length < 8)
+                      return 'Password must be at least 8 characters';
                     return null;
                   },
                 ),
@@ -207,6 +216,52 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   },
                 ),
                 const SizedBox(height: 24),
+
+                // REQ-COMP-001 / REQ-COMP-002: liability and data retention disclosure.
+                // Registration cannot complete until this is acknowledged.
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[850],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        'By creating an account you confirm you are solely '
+                        'responsible for the legality of any content you '
+                        'publish; the platform disclaims liability. You also '
+                        'acknowledge that, once created, your data and '
+                        'content are retained and will not be permanently '
+                        'deleted, and that subscribers retain access to your '
+                        'content even if you later hide your profile.',
+                        style: TextStyle(
+                          color: Colors.grey[400],
+                          fontSize: 12,
+                          height: 1.4,
+                        ),
+                      ),
+                      Row(
+                        children: [
+                          Checkbox(
+                            value: _agreedToTerms,
+                            onChanged: (val) {
+                              setState(() => _agreedToTerms = val ?? false);
+                            },
+                          ),
+                          const Expanded(
+                            child: Text(
+                              'I have read and accept these terms.',
+                              style: TextStyle(fontSize: 13),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
 
                 // Register Action
                 ElevatedButton(

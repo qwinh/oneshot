@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/prime_content.dart';
 import '../../services/discovery_service.dart';
-import '../discovery/prime_card.dart';
+import '../profile/profile_screen.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
@@ -36,27 +36,9 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
-  void _previewResultProfile(AuthorProfile profile) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) {
-        return DraggableScrollableSheet(
-          initialChildSize: 0.8,
-          maxChildSize: 0.95,
-          minChildSize: 0.5,
-          builder: (_, controller) {
-            return Container(
-              decoration: const BoxDecoration(
-                color: Colors.black,
-                borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-              ),
-              child: PrimeCard(profile: profile),
-            );
-          },
-        );
-      },
+  void _openProfile(AuthorProfile profile) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => ProfileScreen(authorId: profile.uid)),
     );
   }
 
@@ -140,7 +122,7 @@ class _SearchScreenState extends State<SearchScreen> {
                               size: 14,
                               color: Colors.white30,
                             ),
-                            onTap: () => _previewResultProfile(profile),
+                            onTap: () => _openProfile(profile),
                           ),
                         );
                       },
