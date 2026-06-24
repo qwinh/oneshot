@@ -24,9 +24,68 @@ class DiscoveryService {
   DiscoveryService({FirebaseFirestore? firestore})
     : _db = firestore ?? FirebaseFirestore.instance;
 
-  /// REQ-FUNC-006: Tag browse filtered by discovery state.
+  /// The default Discovery feed: lazily surfaces existing authors' prime
+  /// works directly, with no tag selection required up front. [tag] is now
+  /// just an optional filter layered on top of that feed — when provided,
+  /// this simply delegates to [browseByTag]; when omitted, it pulls
+  /// straight from the `authors` collection.
+  ///
+  /// Applies the same eligibility rules either way: not yet consumed by
+  /// [viewerId], not the viewer's own profile, and not hidden.
+  Future<List<AuthorProfile>> browseDiscoverable({
+    required String viewerId,
+    String? tag,
+    int limit = 20,
+  }) async {
+    final normalizedTag = tag?.toLowerCase().trim();
+    if (normalizedTag != null && normalizedTag.isNotEmpty) {
+      return browseByTag(viewerId: viewerId, tag: normalizedTag, limit: limit);
+    }
+
+    // 1. Pull a general batch of authors directly — no tag prefilter.
+    final authorsSnap = await _db.collection('authors').limit(limit).get();
+    if (authorsSnap.docs.isEmpty) return [];
+
+    final List<String> candidateIds = authorsSnap.docs
+        .map((d) => d.id)
+        .where((id) => id != viewerId)
+        .toList();
+    if (candidateIds.isEmpty) return [];
+
+    // 2. Fetch consumed relation IDs for this viewer, chunked to respect
+    // Firestore's 30-item `whereIn` limit.
+    final Set<String> consumedAuthorIds = {};
+    for (var i = 0; i < candidateIds.length; i += 30) {
+      final end = (i + 30 > candidateIds.length) ? candidateIds.length : i + 30;
+      final chunk = candidateIds.sublist(i, end);
+      final relSnap = await _db
+          .collection('relations')
+          .where('viewerId', isEqualTo: viewerId)
+          .where('authorId', whereIn: chunk)
+          .where('discovery_consumed', isEqualTo: true)
+          .get();
+      consumedAuthorIds.addAll(
+        relSnap.docs.map((d) => d.data()['authorId'] as String),
+      );
+    }
+
+    // 3. Build out eligible profiles: not self, not consumed, not hidden.
+    final List<AuthorProfile> profiles = [];
+    for (final doc in authorsSnap.docs) {
+      if (doc.id == viewerId) continue;
+      if (consumedAuthorIds.contains(doc.id)) continue;
+      final profile = AuthorProfile.fromMap(doc.id, doc.data());
+      if (!profile.hidden) profiles.add(profile);
+    }
+
+    return profiles;
+  }
+
+  /// REQ-FUNC-006: Tag filter on top of the general discovery feed.
   /// Returns authors tagged with [tag] whose discovery chance is not yet
-  /// consumed by [viewerId]. Excludes hidden profiles.
+  /// consumed by [viewerId]. Excludes hidden profiles. Called directly for
+  /// a tag-only query, or via [browseDiscoverable] when a tag filter is
+  /// layered on top of the default lazy feed.
   Future<List<AuthorProfile>> browseByTag({
     required String viewerId,
     required String tag,
@@ -164,9 +223,7 @@ class DiscoveryService {
   /// REQ-FUNC-016: Viewed Authors History Feed.
   /// Must surface action_type and consumed_at per creator, not just the bare
   /// profile, so the viewer can see *how* and *when* each chance was used.
-  Future<List<ViewedAuthorResult>> getViewedAuthorsFeed(
-    String viewerId,
-  ) async {
+  Future<List<ViewedAuthorResult>> getViewedAuthorsFeed(String viewerId) async {
     final relationsSnap = await _db
         .collection('relations')
         .where('viewerId', isEqualTo: viewerId)

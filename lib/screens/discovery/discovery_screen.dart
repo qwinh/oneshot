@@ -20,12 +20,14 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
   final RelationService _relationService = RelationService();
 
   List<String> _tags = [];
+  // null == "All" (no tag filter, lazy default feed via browseDiscoverable).
   String? _selectedTag;
 
   List<AuthorProfile> _candidates = [];
   int _currentIndex = 0;
 
   bool _isLoading = false;
+  bool _hasLoadedOnce = false;
   String? _statusMessage;
 
   // Real-time tracking of current card relationship
@@ -38,7 +40,8 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
   }
 
   /// REQ-FUNC-007 (Interruption handling recovery)
-  /// Checks on load if the user abandoned an active discovery encounter in their last session.
+  /// Checks on load if the user abandoned an active discovery encounter in
+  /// their last session, then falls through to the default lazy feed.
   Future<void> _checkForInterruptedSession() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -46,6 +49,12 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     setState(() => _isLoading = true);
 
     try {
+      // Load all available browse tags for the filter row.
+      final fetchedTags = await _discoveryService.getAllActiveTags();
+      if (mounted) {
+        setState(() => _tags = fetchedTags);
+      }
+
       // Clean recovery using your findPendingCardAuthorId service method
       final pendingAuthorId = await _discoveryService.findPendingCardAuthorId(
         user.uid,
@@ -59,49 +68,49 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
           setState(() {
             _candidates = [profile];
             _currentIndex = 0;
-            _selectedTag = profile.tags.isNotEmpty
-                ? profile.tags.first
-                : 'Interrupted';
+            _hasLoadedOnce = true;
           });
           await _markCurrentCardAsPending();
+          if (mounted) setState(() => _isLoading = false);
+          return;
         }
       }
 
-      // Load all available browse tags
-      final fetchedTags = await _discoveryService.getAllActiveTags();
-      setState(() {
-        _tags = fetchedTags;
-        _isLoading = false;
-      });
+      // No interrupted card — go straight to the default lazy discovery feed.
+      await _loadDiscoveryFeed();
     } catch (_) {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  Future<void> _loadTagDiscovery(String tag) async {
+  /// Loads the discovery feed via [DiscoveryService.browseDiscoverable].
+  /// When [_selectedTag] is null this pulls the default lazy feed straight
+  /// from `authors`; otherwise it's filtered to that tag.
+  Future<void> _loadDiscoveryFeed() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
     setState(() {
       _isLoading = true;
-      _selectedTag = tag;
       _candidates = [];
       _currentIndex = 0;
       _statusMessage = null;
     });
 
     try {
-      // Corrected to use your optimized browseByTag method signature
-      final list = await _discoveryService.browseByTag(
+      final list = await _discoveryService.browseDiscoverable(
         viewerId: user.uid,
-        tag: tag,
+        tag: _selectedTag,
       );
 
       setState(() {
         _candidates = list;
         _isLoading = false;
+        _hasLoadedOnce = true;
         if (list.isEmpty) {
-          _statusMessage = 'No new creators matching this tag are available.';
+          _statusMessage = _selectedTag == null
+              ? 'No new creators are available to discover right now.'
+              : 'No new creators matching this tag are available.';
         } else {
           // Immediately flag the first card as PENDING to implement Interruption handling
           _markCurrentCardAsPending();
@@ -110,9 +119,16 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     } catch (e) {
       setState(() {
         _isLoading = false;
+        _hasLoadedOnce = true;
         _statusMessage = 'Error loading discovery: ${e.toString()}';
       });
     }
+  }
+
+  void _selectTag(String? tag) {
+    if (_selectedTag == tag) return;
+    setState(() => _selectedTag = tag);
+    _loadDiscoveryFeed();
   }
 
   /// REQ-FUNC-007: Mark the currently shown card as pending
@@ -128,6 +144,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
 
     // Stream/fetch updated relation row
     final rel = await _relationService.getRelation(user.uid, creator.uid);
+    if (!mounted) return;
     setState(() {
       _currentRelation = rel;
     });
@@ -164,7 +181,9 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         _markCurrentCardAsPending();
       } else {
         setState(() {
-          _statusMessage = 'You have discovered all creators in this tag!';
+          _statusMessage = _selectedTag == null
+              ? 'You have discovered all available creators!'
+              : 'You have discovered all creators in this tag!';
         });
       }
     } catch (e) {
@@ -217,6 +236,12 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         title: const Text('OneShot Discovery'),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            onPressed: _isLoading ? null : _loadDiscoveryFeed,
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: Colors.white))
@@ -226,6 +251,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   // Horizontal Tag Browsing list (REQ-FUNC-006)
+                  // Optional filter layered on top of the default lazy feed.
                   const Text(
                     'Browse Creators by Tag',
                     style: TextStyle(
@@ -237,38 +263,39 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                   const SizedBox(height: 8),
                   SizedBox(
                     height: 40,
-                    child: _tags.isEmpty
-                        ? const Center(
-                            child: Text(
-                              'No active tags populated yet.',
-                              style: TextStyle(
-                                color: Colors.grey,
-                                fontSize: 12,
-                              ),
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _tags.length + 1,
+                      itemBuilder: (context, idx) {
+                        if (idx == 0) {
+                          final bool isSelected = _selectedTag == null;
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 8.0),
+                            child: ChoiceChip(
+                              label: const Text('All'),
+                              selected: isSelected,
+                              onSelected: (_) => _selectTag(null),
                             ),
-                          )
-                        : ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: _tags.length,
-                            itemBuilder: (context, idx) {
-                              final tag = _tags[idx];
-                              final isSelected = _selectedTag == tag;
-                              return Padding(
-                                padding: const EdgeInsets.only(right: 8.0),
-                                child: ChoiceChip(
-                                  label: Text('#$tag'),
-                                  selected: isSelected,
-                                  onSelected: (_) => _loadTagDiscovery(tag),
-                                ),
-                              );
-                            },
+                          );
+                        }
+                        final tag = _tags[idx - 1];
+                        final isSelected = _selectedTag == tag;
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 8.0),
+                          child: ChoiceChip(
+                            label: Text('#$tag'),
+                            selected: isSelected,
+                            onSelected: (_) => _selectTag(tag),
                           ),
+                        );
+                      },
+                    ),
                   ),
                   const SizedBox(height: 24),
 
                   // Discovery Card Slot
                   Expanded(
-                    child: _selectedTag == null
+                    child: !_hasLoadedOnce
                         ? _buildWelcomeState()
                         : _currentIndex < _candidates.length
                         ? Column(
@@ -318,7 +345,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
           const Icon(Icons.style_outlined, size: 70, color: Colors.white24),
           const SizedBox(height: 16),
           const Text(
-            'Select a Tag to Start',
+            'Loading Discovery...',
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 8),
