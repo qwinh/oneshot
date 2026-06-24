@@ -190,6 +190,21 @@ class RelationService {
     }, SetOptions(merge: true));
   }
 
+  /// Updates the read later shelf presence for a specific author card.
+  Future<void> setReadLaterStatus({
+    required String viewerId,
+    required String authorId,
+    required bool readLater,
+  }) async {
+    final String docId = '${viewerId}_$authorId';
+    await _relationsCollection.doc(docId).set({
+      'viewerId': viewerId,
+      'authorId': authorId,
+      'read_later': readLater,
+      'updated_at': FieldValue.serverTimestamp(),
+    }, SetOptions(merge: true));
+  }
+
   /// Streams relationship changes dynamically for state-rebuilding reactive contexts.
   Stream<ViewerAuthorRelation?> streamRelation(
     String viewerId,

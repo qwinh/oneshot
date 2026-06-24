@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../../models/prime_content.dart';
 import '../../services/discovery_service.dart';
+import '../../services/relation_service.dart';
 import '../discovery/prime_card.dart';
 import '../profile/profile_screen.dart';
 
@@ -14,6 +15,7 @@ class ReadLaterScreen extends StatefulWidget {
 
 class _ReadLaterScreenState extends State<ReadLaterScreen> {
   final DiscoveryService _discoveryService = DiscoveryService();
+  final RelationService _relationService = RelationService();
 
   List<AuthorProfile> _savedProfiles = [];
   bool _isLoading = false;
@@ -40,6 +42,37 @@ class _ReadLaterScreenState extends State<ReadLaterScreen> {
       ).showSnackBar(SnackBar(content: Text('Error loading feed: $e')));
     } finally {
       setState(() => _isLoading = false);
+    }
+  }
+
+  Future<void> _removeFromReadLater(String authorId) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    try {
+      await _relationService.setReadLaterStatus(
+        viewerId: user.uid,
+        authorId: authorId,
+        readLater: false,
+      );
+
+      // Refresh local view immediately
+      await _fetchFeed();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Removed from Read Later shelf'),
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('Failed to remove: $e')));
+      }
     }
   }
 
@@ -70,18 +103,37 @@ class _ReadLaterScreenState extends State<ReadLaterScreen> {
                     top: false,
                     child: Padding(
                       padding: const EdgeInsets.all(16),
-                      child: TextButton.icon(
-                        onPressed: () {
-                          Navigator.of(context).pop();
-                          Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) =>
-                                  ProfileScreen(authorId: profile.uid),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          TextButton.icon(
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                              Navigator.of(context).push(
+                                MaterialPageRoute(
+                                  builder: (_) =>
+                                      ProfileScreen(authorId: profile.uid),
+                                ),
+                              );
+                            },
+                            icon: const Icon(Icons.person_outline),
+                            label: const Text('View Full Profile'),
+                          ),
+                          TextButton.icon(
+                            onPressed: () {
+                              Navigator.of(context).pop();
+                              _removeFromReadLater(profile.uid);
+                            },
+                            icon: const Icon(
+                              Icons.bookmark_remove,
+                              color: Colors.redAccent,
                             ),
-                          );
-                        },
-                        icon: const Icon(Icons.person_outline),
-                        label: const Text('View Full Profile'),
+                            label: const Text(
+                              'Remove',
+                              style: TextStyle(color: Colors.redAccent),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ),
@@ -102,67 +154,106 @@ class _ReadLaterScreenState extends State<ReadLaterScreen> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _fetchFeed),
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh Shelf',
+            onPressed: _fetchFeed,
+          ),
         ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: Colors.white))
-          : _savedProfiles.isEmpty
-          ? _buildEmptyState()
-          : GridView.builder(
-              padding: const EdgeInsets.all(16),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 2,
-                crossAxisSpacing: 12,
-                mainAxisSpacing: 12,
-                childAspectRatio: 1.1,
-              ),
-              itemCount: _savedProfiles.length,
-              itemBuilder: (context, index) {
-                final profile = _savedProfiles[index];
-                return GestureDetector(
-                  onTap: () => _viewSavedCard(profile),
-                  child: Container(
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.grey[900],
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.white10),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                      children: [
-                        const Icon(Icons.bookmark, color: Colors.orangeAccent),
-                        Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              profile.displayName,
-                              style: const TextStyle(
-                                fontWeight: FontWeight.bold,
-                                fontSize: 14,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+          : RefreshIndicator(
+              color: Colors.white,
+              backgroundColor: Colors.grey[900],
+              onRefresh: _fetchFeed,
+              child: _savedProfiles.isEmpty
+                  ? SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: Container(
+                        height: MediaQuery.of(context).size.height - 150,
+                        alignment: Alignment.center,
+                        child: _buildEmptyState(),
+                      ),
+                    )
+                  : GridView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.all(16),
+                      gridDelegate:
+                          const SliverGridDelegateWithFixedCrossAxisCount(
+                            crossAxisCount: 2,
+                            crossAxisSpacing: 12,
+                            mainAxisSpacing: 12,
+                            childAspectRatio: 1.1,
+                          ),
+                      itemCount: _savedProfiles.length,
+                      itemBuilder: (context, index) {
+                        final profile = _savedProfiles[index];
+                        return GestureDetector(
+                          onTap: () => _viewSavedCard(profile),
+                          child: Container(
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: Colors.grey[900],
+                              borderRadius: BorderRadius.circular(16),
+                              border: Border.all(color: Colors.white10),
                             ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '@${profile.handle}',
-                              style: const TextStyle(
-                                color: Colors.grey,
-                                fontSize: 11,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Row(
+                                  mainAxisAlignment:
+                                      MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    const Icon(
+                                      Icons.bookmark,
+                                      color: Colors.orangeAccent,
+                                    ),
+                                    IconButton(
+                                      constraints: const BoxConstraints(),
+                                      padding: EdgeInsets.zero,
+                                      icon: const Icon(
+                                        Icons.delete_outline,
+                                        color: Colors.white38,
+                                        size: 20,
+                                      ),
+                                      tooltip: 'Remove',
+                                      onPressed: () =>
+                                          _removeFromReadLater(profile.uid),
+                                    ),
+                                  ],
+                                ),
+                                Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      profile.displayName,
+                                      style: const TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 14,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 2),
+                                    Text(
+                                      '@${profile.handle}',
+                                      style: const TextStyle(
+                                        color: Colors.grey,
+                                        fontSize: 11,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                      ],
+                          ),
+                        );
+                      },
                     ),
-                  ),
-                );
-              },
             ),
     );
   }

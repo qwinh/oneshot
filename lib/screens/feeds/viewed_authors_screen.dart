@@ -80,54 +80,77 @@ class _ViewedAuthorsScreenState extends State<ViewedAuthorsScreen> {
         title: const Text('Viewed History'),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh History',
+            onPressed: _fetchFeed,
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: Colors.white))
-          : _history.isEmpty
-          ? _buildEmptyState()
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _history.length,
-              itemBuilder: (context, index) {
-                final entry = _history[index];
-                final profile = entry.profile;
-                return Card(
-                  color: Colors.grey[900],
-                  margin: const EdgeInsets.only(bottom: 10),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: ListTile(
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => ProfileScreen(authorId: profile.uid),
+          : RefreshIndicator(
+              color: Colors.white,
+              backgroundColor: Colors.grey[900],
+              onRefresh: _fetchFeed,
+              child: _history.isEmpty
+                  ? SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: Container(
+                        height: MediaQuery.of(context).size.height - 150,
+                        alignment: Alignment.center,
+                        child: _buildEmptyState(),
                       ),
+                    )
+                  : ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _history.length,
+                      itemBuilder: (context, index) {
+                        final entry = _history[index];
+                        final profile = entry.profile;
+                        return Card(
+                          color: Colors.grey[900],
+                          margin: const EdgeInsets.only(bottom: 10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: ListTile(
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    ProfileScreen(authorId: profile.uid),
+                              ),
+                            ),
+                            leading: CircleAvatar(
+                              backgroundColor: Colors.grey[800],
+                              child: Icon(
+                                _actionIcon(entry.actionType),
+                                color: Colors.white70,
+                                size: 20,
+                              ),
+                            ),
+                            title: Text(
+                              profile.displayName,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            subtitle: Text(
+                              '@${profile.handle} · ${_actionLabel(entry.actionType)}'
+                              '${entry.consumedAt != null ? ' · ${_formatTimestamp(entry.consumedAt)}' : ''}',
+                              style: const TextStyle(color: Colors.grey),
+                            ),
+                            trailing: const Icon(
+                              Icons.arrow_forward_ios,
+                              size: 14,
+                              color: Colors.white24,
+                            ),
+                          ),
+                        );
+                      },
                     ),
-                    leading: CircleAvatar(
-                      backgroundColor: Colors.grey[800],
-                      child: Icon(
-                        _actionIcon(entry.actionType),
-                        color: Colors.white70,
-                        size: 20,
-                      ),
-                    ),
-                    title: Text(
-                      profile.displayName,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    subtitle: Text(
-                      '@${profile.handle} · ${_actionLabel(entry.actionType)}'
-                      '${entry.consumedAt != null ? ' · ${_formatTimestamp(entry.consumedAt)}' : ''}',
-                      style: const TextStyle(color: Colors.grey),
-                    ),
-                    trailing: const Icon(
-                      Icons.arrow_forward_ios,
-                      size: 14,
-                      color: Colors.white24,
-                    ),
-                  ),
-                );
-              },
             ),
     );
   }

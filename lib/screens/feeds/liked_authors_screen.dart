@@ -49,47 +49,70 @@ class _LikedAuthorsScreenState extends State<LikedAuthorsScreen> {
         title: const Text('Liked Authors'),
         backgroundColor: Colors.transparent,
         elevation: 0,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh),
+            tooltip: 'Refresh Feed',
+            onPressed: _fetchFeed,
+          ),
+        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator(color: Colors.white))
-          : _likes.isEmpty
-          ? _buildEmptyState()
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _likes.length,
-              itemBuilder: (context, index) {
-                final profile = _likes[index];
-                return Card(
-                  color: Colors.grey[900],
-                  margin: const EdgeInsets.only(bottom: 10),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: ListTile(
-                    onTap: () => Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => ProfileScreen(authorId: profile.uid),
+          : RefreshIndicator(
+              color: Colors.white,
+              backgroundColor: Colors.grey[900],
+              onRefresh: _fetchFeed,
+              child: _likes.isEmpty
+                  ? SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: Container(
+                        height: MediaQuery.of(context).size.height - 150,
+                        alignment: Alignment.center,
+                        child: _buildEmptyState(),
                       ),
+                    )
+                  : ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.all(16),
+                      itemCount: _likes.length,
+                      itemBuilder: (context, index) {
+                        final profile = _likes[index];
+                        return Card(
+                          color: Colors.grey[900],
+                          margin: const EdgeInsets.only(bottom: 10),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: ListTile(
+                            onTap: () => Navigator.of(context).push(
+                              MaterialPageRoute(
+                                builder: (_) =>
+                                    ProfileScreen(authorId: profile.uid),
+                              ),
+                            ),
+                            leading: CircleAvatar(
+                              backgroundColor: Colors.grey[800],
+                              child: const Icon(
+                                Icons.favorite,
+                                color: Colors.redAccent,
+                                size: 20,
+                              ),
+                            ),
+                            title: Text(
+                              profile.displayName,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            subtitle: Text(
+                              '@${profile.handle}',
+                              style: const TextStyle(color: Colors.grey),
+                            ),
+                          ),
+                        );
+                      },
                     ),
-                    leading: CircleAvatar(
-                      backgroundColor: Colors.grey[800],
-                      child: const Icon(
-                        Icons.favorite,
-                        color: Colors.redAccent,
-                        size: 20,
-                      ),
-                    ),
-                    title: Text(
-                      profile.displayName,
-                      style: const TextStyle(fontWeight: FontWeight.bold),
-                    ),
-                    subtitle: Text(
-                      '@${profile.handle}',
-                      style: const TextStyle(color: Colors.grey),
-                    ),
-                  ),
-                );
-              },
             ),
     );
   }
