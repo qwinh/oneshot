@@ -21,13 +21,13 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
 
   List<String> _tags = [];
   String? _selectedTag;
-  
+
   List<AuthorProfile> _candidates = [];
   int _currentIndex = 0;
-  
+
   bool _isLoading = false;
   String? _statusMessage;
-  
+
   // Real-time tracking of current card relationship
   ViewerAuthorRelation? _currentRelation;
 
@@ -47,20 +47,26 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
 
     try {
       // Clean recovery using your findPendingCardAuthorId service method
-      final pendingAuthorId = await _discoveryService.findPendingCardAuthorId(user.uid);
-      
+      final pendingAuthorId = await _discoveryService.findPendingCardAuthorId(
+        user.uid,
+      );
+
       if (pendingAuthorId != null) {
-        final profile = await _discoveryService.getAuthorProfile(pendingAuthorId);
+        final profile = await _discoveryService.getAuthorProfile(
+          pendingAuthorId,
+        );
         if (profile != null) {
           setState(() {
             _candidates = [profile];
             _currentIndex = 0;
-            _selectedTag = profile.tags.isNotEmpty ? profile.tags.first : 'Interrupted';
+            _selectedTag = profile.tags.isNotEmpty
+                ? profile.tags.first
+                : 'Interrupted';
           });
           await _markCurrentCardAsPending();
         }
       }
-      
+
       // Load all available browse tags
       final fetchedTags = await _discoveryService.getAllActiveTags();
       setState(() {
@@ -162,9 +168,9 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         });
       }
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed: ${e.toString()}')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Failed: ${e.toString()}')));
     }
   }
 
@@ -222,13 +228,25 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                   // Horizontal Tag Browsing list (REQ-FUNC-006)
                   const Text(
                     'Browse Creators by Tag',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.grey),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: Colors.grey,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   SizedBox(
                     height: 40,
                     child: _tags.isEmpty
-                        ? const Center(child: Text('No active tags populated yet.', style: TextStyle(color: Colors.grey, fontSize: 12)))
+                        ? const Center(
+                            child: Text(
+                              'No active tags populated yet.',
+                              style: TextStyle(
+                                color: Colors.grey,
+                                fontSize: 12,
+                              ),
+                            ),
+                          )
                         : ListView.builder(
                             scrollDirection: Axis.horizontal,
                             itemCount: _tags.length,
@@ -253,28 +271,38 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                     child: _selectedTag == null
                         ? _buildWelcomeState()
                         : _currentIndex < _candidates.length
-                            ? Column(
-                                children: [
-                                  Expanded(
-                                    child: PrimeCard(profile: _candidates[_currentIndex]),
+                        ? Column(
+                            children: [
+                              Expanded(
+                                child: SingleChildScrollView(
+                                  child: PrimeCard(
+                                    profile: _candidates[_currentIndex],
                                   ),
-                                  ActionButtons(
-                                    isLiked: _currentRelation?.liked ?? false,
-                                    onNext: () => _handleAction(ActionType.next),
-                                    onSubscribe: () => _handleAction(ActionType.subscribe),
-                                    onReadLater: () => _handleAction(ActionType.readLater),
-                                    onLikeToggled: _toggleLike,
-                                    onViewProfile: _triggerProfileView,
-                                  ),
-                                ],
-                              )
-                            : Center(
-                                child: Text(
-                                  _statusMessage ?? 'All discovery opportunities complete.',
-                                  textAlign: TextAlign.center,
-                                  style: const TextStyle(color: Colors.grey, fontSize: 15),
                                 ),
                               ),
+                              ActionButtons(
+                                isLiked: _currentRelation?.liked ?? false,
+                                onNext: () => _handleAction(ActionType.next),
+                                onSubscribe: () =>
+                                    _handleAction(ActionType.subscribe),
+                                onReadLater: () =>
+                                    _handleAction(ActionType.readLater),
+                                onLikeToggled: _toggleLike,
+                                onViewProfile: _triggerProfileView,
+                              ),
+                            ],
+                          )
+                        : Center(
+                            child: Text(
+                              _statusMessage ??
+                                  'All discovery opportunities complete.',
+                              textAlign: TextAlign.center,
+                              style: const TextStyle(
+                                color: Colors.grey,
+                                fontSize: 15,
+                              ),
+                            ),
+                          ),
                   ),
                 ],
               ),

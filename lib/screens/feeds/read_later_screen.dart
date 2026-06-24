@@ -61,7 +61,11 @@ class _ReadLaterScreenState extends State<ReadLaterScreen> {
               ),
               child: Column(
                 children: [
-                  Expanded(child: PrimeCard(profile: profile)),
+                  Expanded(
+                    child: SingleChildScrollView(
+                      child: PrimeCard(profile: profile),
+                    ),
+                  ),
                   SafeArea(
                     top: false,
                     child: Padding(

@@ -84,13 +84,11 @@ class PrimeCard extends StatelessWidget {
           const Divider(height: 1, color: Colors.white10),
 
           // Core Prime Content (REQ-FUNC-003)
-          Expanded(
-            child: SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: profile.primeContentType == PrimeContentType.text
-                  ? _buildTextPayload()
-                  : _buildImageSetGrid(),
-            ),
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: profile.primeContentType == PrimeContentType.text
+                ? _buildTextPayload()
+                : _buildImageSetGrid(),
           ),
         ],
       ),
