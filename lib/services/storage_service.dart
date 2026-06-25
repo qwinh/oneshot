@@ -1,38 +1,39 @@
+// lib/services/storage_service.dart
+
 import 'dart:typed_data';
-import 'package:firebase_storage/firebase_storage.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
 
 class StorageService {
-  final FirebaseStorage _storage = FirebaseStorage.instance;
+  // 🔑 Get your free API key at https://imgbb.com/
+  final String apiKey =
+      'd119856c209a4f9d7579caecb90defa1'; // <-- replace with your real key
 
-  /// Uploads binary raw image bytes to a dedicated directory for the creator.
-  /// Returns the public secure download URL.
   Future<String> uploadPrimeImage({
     required String authorId,
     required String fileName,
     required Uint8List bytes,
   }) async {
-    // Unique storage path structured neatly per author profile
-    final String path = 'authors/$authorId/prime/$fileName';
-    final Reference ref = _storage.ref().child(path);
-
-    // Upload with standard metadata definition
-    final UploadTask uploadTask = ref.putData(
-      bytes,
-      SettableMetadata(contentType: 'image/jpeg'),
+    var request = http.MultipartRequest(
+      'POST',
+      Uri.parse('https://api.imgbb.com/1/upload?key=$apiKey'),
     );
-
-    final TaskSnapshot snapshot = await uploadTask;
-    final String downloadUrl = await snapshot.ref.getDownloadURL();
-    return downloadUrl;
+    request.files.add(
+      http.MultipartFile.fromBytes('image', bytes, filename: fileName),
+    );
+    final response = await request.send();
+    final responseBody = await response.stream.bytesToString();
+    final json = jsonDecode(responseBody);
+    if (json['success'] == true) {
+      return json['data']['url'];
+    } else {
+      throw Exception('ImgBB upload failed: ${json['error']['message']}');
+    }
   }
 
-  /// Deletes a specific file from Firebase Storage
+  // ImgBB has no free deletion API, so we keep this as a no-op
   Future<void> deleteImageByUrl(String url) async {
-    try {
-      final Reference ref = _storage.refFromURL(url);
-      await ref.delete();
-    } catch (_) {
-      // Graceful error fallback for PoC stability
-    }
+    // optional: you could ignore or log
+    return;
   }
 }
