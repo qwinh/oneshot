@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:oneshot/models/prime_content.dart';
 import 'package:oneshot/theme/app_theme.dart';
-import 'package:oneshot/widgets/image_grid.dart';
 
 class PrimeCard extends StatelessWidget {
   final AuthorProfile profile;
@@ -10,19 +9,20 @@ class PrimeCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      decoration: BoxDecoration(
-        color: kSurface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-        border: Border.all(color: kBorder),
+    return Card(
+      color: kSurface,
+      margin: const EdgeInsets.only(bottom: 12),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: kBorder),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          // Author Header
-          Padding(
-            padding: const EdgeInsets.all(16.0),
-            child: Row(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // Author header
+            Row(
               children: [
                 CircleAvatar(
                   backgroundColor: kBorder,
@@ -45,7 +45,7 @@ class PrimeCard extends StatelessWidget {
                         profile.displayName,
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
-                          fontSize: 16,
+                          fontSize: 15,
                           color: kTextPrimary,
                         ),
                       ),
@@ -54,6 +54,7 @@ class PrimeCard extends StatelessWidget {
                     ],
                   ),
                 ),
+                // PRIME badge
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
@@ -75,50 +76,62 @@ class PrimeCard extends StatelessWidget {
                 ),
               ],
             ),
-          ),
-          const Divider(height: 1, color: kBorder),
-
-          // Core Prime Content
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: profile.primeBlocks.every((b) => b is TextBlock)
-                ? _buildTextPayload()
-                : _buildImageSetGrid(),
-          ),
-        ],
+            const SizedBox(height: 12),
+            // Blocks rendered sequentially, same as PostCard
+            ...profile.primeBlocks.map((block) => _buildBlock(block)),
+            // Tags
+            if (profile.tags.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 6,
+                runSpacing: 4,
+                children: profile.tags
+                    .map(
+                      (tag) => Text(
+                        '#$tag',
+                        style: kSubtitleText.copyWith(
+                          color: kAccent,
+                          fontSize: 13,
+                        ),
+                      ),
+                    )
+                    .toList(),
+              ),
+            ],
+          ],
+        ),
       ),
     );
   }
 
-  Widget _buildTextPayload() {
-    return Text(
-      profile.primeBlocks.whereType<TextBlock>().map((b) => b.text).join('\n'),
-      style: kBodyText,
-    );
-  }
-
-  Widget _buildImageSetGrid() {
-    final imageBlocks = profile.primeBlocks.whereType<ImageBlock>().toList();
-    if (imageBlocks.isEmpty) return const SizedBox.shrink();
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          'Discovery Image Portfolio',
-          style: TextStyle(
-            color: kTextSecondary,
-            fontSize: 12,
-            fontWeight: FontWeight.bold,
+  Widget _buildBlock(PrimeBlock block) {
+    if (block is TextBlock) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Text(block.text, style: kBodyText),
+      );
+    } else if (block is ImageBlock) {
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(8),
+          child: Image.network(
+            block.url,
+            fit: BoxFit.cover,
+            width: double.infinity,
+            height: 200,
+            errorBuilder: (_, __, ___) => Container(
+              height: 200,
+              color: kSurface,
+              child: const Icon(
+                Icons.broken_image_outlined,
+                color: kTextSecondary,
+              ),
+            ),
           ),
         ),
-        const SizedBox(height: 12),
-        ImageGrid(
-          images: imageBlocks
-              .map((b) => PrimeImage(url: b.url, name: b.name))
-              .toList(),
-        ),
-      ],
-    );
+      );
+    }
+    return const SizedBox.shrink();
   }
 }

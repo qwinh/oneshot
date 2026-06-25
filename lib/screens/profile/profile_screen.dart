@@ -192,37 +192,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                     ),
                   if (!_isOwnProfile) _buildActionRow(),
                   const SizedBox(height: 16),
-                  const Text(
-                    'Prime Content',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      color: kTextPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
                   PrimeCard(profile: _profile!),
-                  const SizedBox(height: 24),
-                  const Text(
-                    'Posts',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      color: kTextPrimary,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
                   if (_works.isEmpty)
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 12),
                       child: Text(
-                        'No standard posts published yet.',
+                        'No posts published yet.',
                         style: TextStyle(color: kTextSecondary, fontSize: 13),
                       ),
                     )
                   else
-                    // ✅ Use PostCard for each work
-                    ..._works.map((work) => PostCard(work: work)).toList(),
+                    ..._works.map((work) => PostCard(work: work)),
                 ],
               ),
             ),
