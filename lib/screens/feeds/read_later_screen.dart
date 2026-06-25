@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../models/prime_content.dart';
-import '../../services/discovery_service.dart';
-import '../../services/relation_service.dart';
+import 'package:oneshot/models/prime_content.dart';
+import 'package:oneshot/services/discovery_service.dart';
+import 'package:oneshot/services/relation_service.dart';
+import 'package:oneshot/theme/app_theme.dart';
 import '../discovery/prime_card.dart';
 import '../profile/profile_screen.dart';
 
@@ -33,9 +34,7 @@ class _ReadLaterScreenState extends State<ReadLaterScreen> {
     setState(() => _isLoading = true);
     try {
       final list = await _discoveryService.getReadLaterFeed(user.uid);
-      setState(() {
-        _savedProfiles = list;
-      });
+      setState(() => _savedProfiles = list);
     } catch (e) {
       ScaffoldMessenger.of(
         context,
@@ -55,10 +54,7 @@ class _ReadLaterScreenState extends State<ReadLaterScreen> {
         authorId: authorId,
         readLater: false,
       );
-
-      // Refresh local view immediately
       await _fetchFeed();
-
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -89,7 +85,7 @@ class _ReadLaterScreenState extends State<ReadLaterScreen> {
           builder: (_, controller) {
             return Container(
               decoration: const BoxDecoration(
-                color: Colors.black,
+                color: kBg,
                 borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
               ),
               child: Column(
@@ -116,8 +112,14 @@ class _ReadLaterScreenState extends State<ReadLaterScreen> {
                                 ),
                               );
                             },
-                            icon: const Icon(Icons.person_outline),
-                            label: const Text('View Full Profile'),
+                            icon: const Icon(
+                              Icons.person_outline,
+                              color: kTextPrimary,
+                            ),
+                            label: const Text(
+                              'View Full Profile',
+                              style: TextStyle(color: kTextPrimary),
+                            ),
                           ),
                           TextButton.icon(
                             onPressed: () {
@@ -126,11 +128,11 @@ class _ReadLaterScreenState extends State<ReadLaterScreen> {
                             },
                             icon: const Icon(
                               Icons.bookmark_remove,
-                              color: Colors.redAccent,
+                              color: kDestructive,
                             ),
                             label: const Text(
                               'Remove',
-                              style: TextStyle(color: Colors.redAccent),
+                              style: TextStyle(color: kDestructive),
                             ),
                           ),
                         ],
@@ -149,9 +151,10 @@ class _ReadLaterScreenState extends State<ReadLaterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: kBg,
       appBar: AppBar(
         title: const Text('Read Later Shelf'),
-        backgroundColor: Colors.transparent,
+        backgroundColor: kBg,
         elevation: 0,
         actions: [
           IconButton(
@@ -162,10 +165,10 @@ class _ReadLaterScreenState extends State<ReadLaterScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Colors.white))
+          ? const Center(child: CircularProgressIndicator(color: kAccent))
           : RefreshIndicator(
-              color: Colors.white,
-              backgroundColor: Colors.grey[900],
+              color: kAccent,
+              backgroundColor: kSurface,
               onRefresh: _fetchFeed,
               child: _savedProfiles.isEmpty
                   ? SingleChildScrollView(
@@ -194,9 +197,9 @@ class _ReadLaterScreenState extends State<ReadLaterScreen> {
                           child: Container(
                             padding: const EdgeInsets.all(16),
                             decoration: BoxDecoration(
-                              color: Colors.grey[900],
+                              color: kSurface,
                               borderRadius: BorderRadius.circular(16),
-                              border: Border.all(color: Colors.white10),
+                              border: Border.all(color: kBorder),
                             ),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -232,6 +235,7 @@ class _ReadLaterScreenState extends State<ReadLaterScreen> {
                                       style: const TextStyle(
                                         fontWeight: FontWeight.bold,
                                         fontSize: 14,
+                                        color: kTextPrimary,
                                       ),
                                       maxLines: 1,
                                       overflow: TextOverflow.ellipsis,
@@ -239,8 +243,7 @@ class _ReadLaterScreenState extends State<ReadLaterScreen> {
                                     const SizedBox(height: 2),
                                     Text(
                                       '@${profile.handle}',
-                                      style: const TextStyle(
-                                        color: Colors.grey,
+                                      style: kSubtitleText.copyWith(
                                         fontSize: 11,
                                       ),
                                       maxLines: 1,
@@ -273,12 +276,16 @@ class _ReadLaterScreenState extends State<ReadLaterScreen> {
             const SizedBox(height: 16),
             const Text(
               'Your Read Later Shelf is Empty',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: kTextPrimary,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               "Save discovery cards to your shelf during browsing to read their full contents later.",
-              style: TextStyle(color: Colors.grey[500], fontSize: 13),
+              style: kSubtitleText,
               textAlign: TextAlign.center,
             ),
           ],

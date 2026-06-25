@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../models/prime_content.dart';
-import '../../services/discovery_service.dart';
+import 'package:oneshot/models/prime_content.dart';
+import 'package:oneshot/services/discovery_service.dart';
+import 'package:oneshot/theme/app_theme.dart';
 import '../profile/profile_screen.dart';
 
 class LikedAuthorsScreen extends StatefulWidget {
@@ -30,9 +31,7 @@ class _LikedAuthorsScreenState extends State<LikedAuthorsScreen> {
     setState(() => _isLoading = true);
     try {
       final list = await _discoveryService.getLikedAuthorsFeed(user.uid);
-      setState(() {
-        _likes = list;
-      });
+      setState(() => _likes = list);
     } catch (e) {
       ScaffoldMessenger.of(
         context,
@@ -45,9 +44,10 @@ class _LikedAuthorsScreenState extends State<LikedAuthorsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: kBg,
       appBar: AppBar(
         title: const Text('Liked Authors'),
-        backgroundColor: Colors.transparent,
+        backgroundColor: kBg,
         elevation: 0,
         actions: [
           IconButton(
@@ -58,10 +58,10 @@ class _LikedAuthorsScreenState extends State<LikedAuthorsScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Colors.white))
+          ? const Center(child: CircularProgressIndicator(color: kAccent))
           : RefreshIndicator(
-              color: Colors.white,
-              backgroundColor: Colors.grey[900],
+              color: kAccent,
+              backgroundColor: kSurface,
               onRefresh: _fetchFeed,
               child: _likes.isEmpty
                   ? SingleChildScrollView(
@@ -79,10 +79,11 @@ class _LikedAuthorsScreenState extends State<LikedAuthorsScreen> {
                       itemBuilder: (context, index) {
                         final profile = _likes[index];
                         return Card(
-                          color: Colors.grey[900],
+                          color: kSurface,
                           margin: const EdgeInsets.only(bottom: 10),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
+                            side: const BorderSide(color: kBorder),
                           ),
                           child: ListTile(
                             onTap: () => Navigator.of(context).push(
@@ -92,7 +93,7 @@ class _LikedAuthorsScreenState extends State<LikedAuthorsScreen> {
                               ),
                             ),
                             leading: CircleAvatar(
-                              backgroundColor: Colors.grey[800],
+                              backgroundColor: kBorder,
                               child: const Icon(
                                 Icons.favorite,
                                 color: Colors.redAccent,
@@ -103,11 +104,12 @@ class _LikedAuthorsScreenState extends State<LikedAuthorsScreen> {
                               profile.displayName,
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
+                                color: kTextPrimary,
                               ),
                             ),
                             subtitle: Text(
                               '@${profile.handle}',
-                              style: const TextStyle(color: Colors.grey),
+                              style: kSubtitleText,
                             ),
                           ),
                         );
@@ -126,12 +128,16 @@ class _LikedAuthorsScreenState extends State<LikedAuthorsScreen> {
           const SizedBox(height: 16),
           const Text(
             'No Liked Authors Yet',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: kTextPrimary,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
             "Authors you mark with a like will appear here.",
-            style: TextStyle(color: Colors.grey[500]),
+            style: kSubtitleText,
           ),
         ],
       ),

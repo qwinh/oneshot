@@ -1,10 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../models/prime_content.dart';
-import '../../models/relation.dart';
-import '../../services/discovery_service.dart';
-import '../../services/relation_service.dart';
-import '../../widgets/action_buttons.dart';
+import 'package:oneshot/models/prime_content.dart';
+import 'package:oneshot/models/relation.dart';
+import 'package:oneshot/services/discovery_service.dart';
+import 'package:oneshot/services/relation_service.dart';
+import 'package:oneshot/theme/app_theme.dart';
+import 'package:oneshot/widgets/action_buttons.dart';
 import 'prime_card.dart';
 import '../profile/profile_screen.dart';
 
@@ -20,7 +21,6 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
   final RelationService _relationService = RelationService();
 
   List<String> _tags = [];
-  // null == "All" (no tag filter, lazy default feed via browseDiscoverable).
   String? _selectedTag;
 
   List<AuthorProfile> _candidates = [];
@@ -30,7 +30,6 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
   bool _hasLoadedOnce = false;
   String? _statusMessage;
 
-  // Real-time tracking of current card relationship
   ViewerAuthorRelation? _currentRelation;
 
   @override
@@ -39,9 +38,6 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     _checkForInterruptedSession();
   }
 
-  /// REQ-FUNC-007 (Interruption handling recovery)
-  /// Checks on load if the user abandoned an active discovery encounter in
-  /// their last session, then falls through to the default lazy feed.
   Future<void> _checkForInterruptedSession() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -49,17 +45,12 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     setState(() => _isLoading = true);
 
     try {
-      // Load all available browse tags for the filter row.
       final fetchedTags = await _discoveryService.getAllActiveTags();
-      if (mounted) {
-        setState(() => _tags = fetchedTags);
-      }
+      if (mounted) setState(() => _tags = fetchedTags);
 
-      // Clean recovery using your findPendingCardAuthorId service method
       final pendingAuthorId = await _discoveryService.findPendingCardAuthorId(
         user.uid,
       );
-
       if (pendingAuthorId != null) {
         final profile = await _discoveryService.getAuthorProfile(
           pendingAuthorId,
@@ -76,16 +67,12 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         }
       }
 
-      // No interrupted card — go straight to the default lazy discovery feed.
       await _loadDiscoveryFeed();
     } catch (_) {
       if (mounted) setState(() => _isLoading = false);
     }
   }
 
-  /// Loads the discovery feed via [DiscoveryService.browseDiscoverable].
-  /// When [_selectedTag] is null this pulls the default lazy feed straight
-  /// from `authors`; otherwise it's filtered to that tag.
   Future<void> _loadDiscoveryFeed() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
@@ -112,7 +99,6 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
               ? 'No new creators are available to discover right now.'
               : 'No new creators matching this tag are available.';
         } else {
-          // Immediately flag the first card as PENDING to implement Interruption handling
           _markCurrentCardAsPending();
         }
       });
@@ -131,7 +117,6 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     _loadDiscoveryFeed();
   }
 
-  /// REQ-FUNC-007: Mark the currently shown card as pending
   Future<void> _markCurrentCardAsPending() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null || _currentIndex >= _candidates.length) return;
@@ -142,15 +127,11 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
       authorId: creator.uid,
     );
 
-    // Stream/fetch updated relation row
     final rel = await _relationService.getRelation(user.uid, creator.uid);
     if (!mounted) return;
-    setState(() {
-      _currentRelation = rel;
-    });
+    setState(() => _currentRelation = rel);
   }
 
-  /// Executes atomic resolution (Subscribe, Next, Read Later) and steps the card deck index
   Future<void> _handleAction(ActionType action) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null || _currentIndex >= _candidates.length) return;
@@ -171,7 +152,6 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         ),
       );
 
-      // Step index to next candidate
       setState(() {
         _currentIndex++;
         _currentRelation = null;
@@ -211,8 +191,6 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
     });
   }
 
-  /// REQ-FUNC-011 / REQ-INT-002: Viewing the profile from the discovery card
-  /// is recorded for history but must NEVER consume the discovery chance.
   Future<void> _triggerProfileView() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null || _currentIndex >= _candidates.length) return;
@@ -232,9 +210,10 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: kBg,
       appBar: AppBar(
         title: const Text('OneShot Discovery'),
-        backgroundColor: Colors.transparent,
+        backgroundColor: kBg,
         elevation: 0,
         actions: [
           IconButton(
@@ -244,20 +223,18 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Colors.white))
+          ? const Center(child: CircularProgressIndicator(color: kAccent))
           : Padding(
               padding: const EdgeInsets.all(16.0),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Horizontal Tag Browsing list (REQ-FUNC-006)
-                  // Optional filter layered on top of the default lazy feed.
                   const Text(
                     'Browse Creators by Tag',
                     style: TextStyle(
                       fontWeight: FontWeight.bold,
                       fontSize: 13,
-                      color: Colors.grey,
+                      color: kTextSecondary,
                     ),
                   ),
                   const SizedBox(height: 8),
@@ -275,6 +252,11 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                               label: const Text('All'),
                               selected: isSelected,
                               onSelected: (_) => _selectTag(null),
+                              backgroundColor: kSurface,
+                              selectedColor: kAccent,
+                              labelStyle: TextStyle(
+                                color: isSelected ? kBg : kTextPrimary,
+                              ),
                             ),
                           );
                         }
@@ -286,6 +268,11 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                             label: Text('#$tag'),
                             selected: isSelected,
                             onSelected: (_) => _selectTag(tag),
+                            backgroundColor: kSurface,
+                            selectedColor: kAccent,
+                            labelStyle: TextStyle(
+                              color: isSelected ? kBg : kTextPrimary,
+                            ),
                           ),
                         );
                       },
@@ -293,7 +280,6 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                   ),
                   const SizedBox(height: 24),
 
-                  // Discovery Card Slot
                   Expanded(
                     child: !_hasLoadedOnce
                         ? _buildWelcomeState()
@@ -324,10 +310,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                               _statusMessage ??
                                   'All discovery opportunities complete.',
                               textAlign: TextAlign.center,
-                              style: const TextStyle(
-                                color: Colors.grey,
-                                fontSize: 15,
-                              ),
+                              style: kSubtitleText.copyWith(fontSize: 15),
                             ),
                           ),
                   ),
@@ -346,12 +329,16 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
           const SizedBox(height: 16),
           const Text(
             'Loading Discovery...',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: kTextPrimary,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
             'You have one chance to discover each creator. Choose your consuming actions wisely.',
-            style: TextStyle(color: Colors.grey[500], fontSize: 13),
+            style: kSubtitleText,
             textAlign: TextAlign.center,
           ),
         ],

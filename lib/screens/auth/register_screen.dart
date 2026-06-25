@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:oneshot/services/auth_service.dart';
+import 'package:oneshot/theme/app_theme.dart';
 
 class RegisterScreen extends StatefulWidget {
   const RegisterScreen({super.key});
@@ -49,16 +50,15 @@ class _RegisterScreenState extends State<RegisterScreen> {
       await _authService.register(
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
-        ipAddress: '127.0.0.1', // Simplistic local sandbox IP placeholder
+        ipAddress: '127.0.0.1',
       );
 
-      // Auto-pop to Login screen or let state change cascade
       if (mounted) {
         Navigator.of(context).pop();
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Registration successful. Verification email sent.'),
-            backgroundColor: Colors.green,
+            backgroundColor: kSuccess,
           ),
         );
       }
@@ -78,12 +78,12 @@ class _RegisterScreenState extends State<RegisterScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[900],
+      backgroundColor: kBg,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
+        backgroundColor: kBg,
         elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          icon: const Icon(Icons.arrow_back, color: kTextPrimary),
           onPressed: () => Navigator.of(context).pop(),
         ),
       ),
@@ -101,53 +101,46 @@ class _RegisterScreenState extends State<RegisterScreen> {
                   style: TextStyle(
                     fontSize: 28,
                     fontWeight: FontWeight.bold,
-                    color: Colors.white,
+                    color: kTextPrimary,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'Register to start sharing and discovering content.',
-                  style: TextStyle(fontSize: 14, color: Colors.grey[400]),
+                  style: kSubtitleText,
                 ),
                 const SizedBox(height: 32),
 
-                // Error Notification Card
                 if (_errorMessage != null) ...[
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.redAccent.withOpacity(0.15),
+                      color: kDestructive.withOpacity(0.15),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: Colors.redAccent.withOpacity(0.5),
-                      ),
+                      border: Border.all(color: kDestructive.withOpacity(0.5)),
                     ),
                     child: Text(
                       _errorMessage!,
-                      style: const TextStyle(
-                        color: Colors.redAccent,
-                        fontSize: 13,
-                      ),
+                      style: const TextStyle(color: kDestructive, fontSize: 13),
                       textAlign: TextAlign.center,
                     ),
                   ),
                   const SizedBox(height: 16),
                 ],
 
-                // Email Form Field
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
-                  style: const TextStyle(color: Colors.white),
+                  style: const TextStyle(color: kTextPrimary),
                   decoration: InputDecoration(
                     labelText: 'Email Address',
-                    labelStyle: TextStyle(color: Colors.grey[400]),
+                    labelStyle: kSubtitleText,
                     enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.grey[700]!),
+                      borderSide: const BorderSide(color: kBorder),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderSide: const BorderSide(color: Colors.white),
+                      borderSide: const BorderSide(color: kAccent),
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
@@ -163,20 +156,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Password Form Field
                 TextFormField(
                   controller: _passwordController,
                   obscureText: true,
-                  style: const TextStyle(color: Colors.white),
+                  style: const TextStyle(color: kTextPrimary),
                   decoration: InputDecoration(
                     labelText: 'Password',
-                    labelStyle: TextStyle(color: Colors.grey[400]),
+                    labelStyle: kSubtitleText,
                     enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.grey[700]!),
+                      borderSide: const BorderSide(color: kBorder),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderSide: const BorderSide(color: Colors.white),
+                      borderSide: const BorderSide(color: kAccent),
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
@@ -190,20 +182,19 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Confirm Password Field
                 TextFormField(
                   controller: _confirmPasswordController,
                   obscureText: true,
-                  style: const TextStyle(color: Colors.white),
+                  style: const TextStyle(color: kTextPrimary),
                   decoration: InputDecoration(
                     labelText: 'Confirm Password',
-                    labelStyle: TextStyle(color: Colors.grey[400]),
+                    labelStyle: kSubtitleText,
                     enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.grey[700]!),
+                      borderSide: const BorderSide(color: kBorder),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderSide: const BorderSide(color: Colors.white),
+                      borderSide: const BorderSide(color: kAccent),
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
@@ -217,12 +208,10 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // REQ-COMP-001 / REQ-COMP-002: liability and data retention disclosure.
-                // Registration cannot complete until this is acknowledged.
                 Container(
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
-                    color: Colors.grey[850],
+                    color: kSurface,
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Column(
@@ -236,11 +225,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                         'content are retained and will not be permanently '
                         'deleted, and that subscribers retain access to your '
                         'content even if you later hide your profile.',
-                        style: TextStyle(
-                          color: Colors.grey[400],
-                          fontSize: 12,
-                          height: 1.4,
-                        ),
+                        style: kSubtitleText.copyWith(fontSize: 12),
                       ),
                       Row(
                         children: [
@@ -249,11 +234,17 @@ class _RegisterScreenState extends State<RegisterScreen> {
                             onChanged: (val) {
                               setState(() => _agreedToTerms = val ?? false);
                             },
+                            fillColor: WidgetStateProperty.resolveWith(
+                              (states) => kAccent,
+                            ),
                           ),
                           const Expanded(
                             child: Text(
                               'I have read and accept these terms.',
-                              style: TextStyle(fontSize: 13),
+                              style: TextStyle(
+                                color: kTextPrimary,
+                                fontSize: 13,
+                              ),
                             ),
                           ),
                         ],
@@ -263,12 +254,11 @@ class _RegisterScreenState extends State<RegisterScreen> {
                 ),
                 const SizedBox(height: 8),
 
-                // Register Action
                 ElevatedButton(
                   onPressed: _isLoading ? null : _handleRegister,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: Colors.black,
+                    backgroundColor: kTextPrimary,
+                    foregroundColor: kBg,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -281,7 +271,7 @@ class _RegisterScreenState extends State<RegisterScreen> {
                           width: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: Colors.black,
+                            color: kBg,
                           ),
                         )
                       : const Text(

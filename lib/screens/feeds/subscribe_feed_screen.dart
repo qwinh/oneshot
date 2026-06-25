@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../models/work.dart';
-import '../../services/discovery_service.dart';
+import 'package:oneshot/models/work.dart';
+import 'package:oneshot/services/discovery_service.dart';
+import 'package:oneshot/theme/app_theme.dart';
 
 class SubscribeFeedScreen extends StatefulWidget {
   const SubscribeFeedScreen({super.key});
@@ -37,9 +38,7 @@ class _SubscribeFeedScreenState extends State<SubscribeFeedScreen> {
     setState(() => _isLoading = true);
     try {
       final list = await _discoveryService.getSubscribeFeed(user.uid);
-      setState(() {
-        _works = list;
-      });
+      setState(() => _works = list);
     } catch (e) {
       ScaffoldMessenger.of(
         context,
@@ -49,8 +48,6 @@ class _SubscribeFeedScreenState extends State<SubscribeFeedScreen> {
     }
   }
 
-  /// Simulated utility allowing creators to easily post regular post updates
-  /// to demonstrate the sub timeline immediately to spectators.
   Future<void> _publishWork() async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null || _workController.text.trim().isEmpty) return;
@@ -72,7 +69,10 @@ class _SubscribeFeedScreenState extends State<SubscribeFeedScreen> {
       _workController.clear();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Work published successfully!')),
+          const SnackBar(
+            content: Text('Work published successfully!'),
+            backgroundColor: kSuccess,
+          ),
         );
       }
       await _fetchFeed();
@@ -88,21 +88,21 @@ class _SubscribeFeedScreenState extends State<SubscribeFeedScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: kBg,
       appBar: AppBar(
         title: const Text('Subscribe Feed'),
-        backgroundColor: Colors.transparent,
+        backgroundColor: kBg,
         elevation: 0,
         actions: [
           IconButton(icon: const Icon(Icons.refresh), onPressed: _fetchFeed),
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Colors.white))
+          ? const Center(child: CircularProgressIndicator(color: kAccent))
           : Column(
               children: [
-                // Quick Publish Console for PoC Demo convenience
                 _buildPublishWidget(),
-                const Divider(height: 1, color: Colors.white10),
+                const Divider(height: 1, color: kBorder),
                 Expanded(
                   child: _works.isEmpty
                       ? _buildEmptyState()
@@ -112,11 +112,11 @@ class _SubscribeFeedScreenState extends State<SubscribeFeedScreen> {
                           itemBuilder: (context, index) {
                             final work = _works[index];
                             return Card(
-                              color: Colors.grey[900],
+                              color: kSurface,
                               margin: const EdgeInsets.only(bottom: 12),
                               shape: RoundedRectangleBorder(
                                 borderRadius: BorderRadius.circular(12),
-                                side: const BorderSide(color: Colors.white10),
+                                side: const BorderSide(color: kBorder),
                               ),
                               child: Padding(
                                 padding: const EdgeInsets.all(16.0),
@@ -132,12 +132,12 @@ class _SubscribeFeedScreenState extends State<SubscribeFeedScreen> {
                                           style: const TextStyle(
                                             fontWeight: FontWeight.bold,
                                             fontSize: 15,
+                                            color: kTextPrimary,
                                           ),
                                         ),
                                         Text(
                                           '${work.createdAt.hour}:${work.createdAt.minute.toString().padLeft(2, '0')}',
-                                          style: const TextStyle(
-                                            color: Colors.grey,
+                                          style: kSubtitleText.copyWith(
                                             fontSize: 12,
                                           ),
                                         ),
@@ -146,20 +146,12 @@ class _SubscribeFeedScreenState extends State<SubscribeFeedScreen> {
                                     const SizedBox(height: 2),
                                     Text(
                                       '@${work.authorHandle}',
-                                      style: const TextStyle(
-                                        color: Colors.grey,
+                                      style: kSubtitleText.copyWith(
                                         fontSize: 12,
                                       ),
                                     ),
                                     const SizedBox(height: 12),
-                                    Text(
-                                      work.content,
-                                      style: const TextStyle(
-                                        fontSize: 14,
-                                        height: 1.4,
-                                        color: Colors.white,
-                                      ),
-                                    ),
+                                    Text(work.content, style: kBodyText),
                                   ],
                                 ),
                               ),
@@ -175,7 +167,7 @@ class _SubscribeFeedScreenState extends State<SubscribeFeedScreen> {
   Widget _buildPublishWidget() {
     return Container(
       padding: const EdgeInsets.all(16),
-      color: Colors.grey[900],
+      color: kSurface,
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
@@ -194,15 +186,13 @@ class _SubscribeFeedScreenState extends State<SubscribeFeedScreen> {
                 child: TextField(
                   controller: _workController,
                   maxLines: 2,
-                  style: const TextStyle(color: Colors.white, fontSize: 14),
+                  style: const TextStyle(color: kTextPrimary, fontSize: 14),
                   decoration: InputDecoration(
                     hintText: 'Share a regular text post update...',
-                    hintStyle: const TextStyle(
-                      color: Colors.grey,
-                      fontSize: 13,
-                    ),
+                    hintStyle: kSubtitleText.copyWith(fontSize: 13),
                     border: OutlineInputBorder(
                       borderRadius: BorderRadius.circular(8),
+                      borderSide: const BorderSide(color: kBorder),
                     ),
                     contentPadding: const EdgeInsets.symmetric(
                       horizontal: 12,
@@ -218,15 +208,13 @@ class _SubscribeFeedScreenState extends State<SubscribeFeedScreen> {
                       height: 24,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Colors.white,
+                        color: kAccent,
                       ),
                     )
                   : IconButton(
                       onPressed: _publishWork,
-                      icon: const Icon(Icons.send, color: Colors.white),
-                      style: IconButton.styleFrom(
-                        backgroundColor: Colors.grey[800],
-                      ),
+                      icon: const Icon(Icons.send, color: kTextPrimary),
+                      style: IconButton.styleFrom(backgroundColor: kBorder),
                     ),
             ],
           ),
@@ -246,12 +234,16 @@ class _SubscribeFeedScreenState extends State<SubscribeFeedScreen> {
             const SizedBox(height: 16),
             const Text(
               'Your Subscribe Feed is Empty',
-              style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: kTextPrimary,
+              ),
             ),
             const SizedBox(height: 8),
             Text(
               'Discover creators through the tag directory and tap Subscribe to see their ongoing posts here.',
-              style: TextStyle(color: Colors.grey[500], fontSize: 13),
+              style: kSubtitleText,
               textAlign: TextAlign.center,
             ),
           ],

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../models/relation.dart';
-import '../../services/discovery_service.dart';
+import 'package:oneshot/models/relation.dart';
+import 'package:oneshot/services/discovery_service.dart';
+import 'package:oneshot/theme/app_theme.dart';
 import '../profile/profile_screen.dart';
 
 class ViewedAuthorsScreen extends StatefulWidget {
@@ -30,9 +31,7 @@ class _ViewedAuthorsScreenState extends State<ViewedAuthorsScreen> {
     setState(() => _isLoading = true);
     try {
       final list = await _discoveryService.getViewedAuthorsFeed(user.uid);
-      setState(() {
-        _history = list;
-      });
+      setState(() => _history = list);
     } catch (e) {
       ScaffoldMessenger.of(
         context,
@@ -76,9 +75,10 @@ class _ViewedAuthorsScreenState extends State<ViewedAuthorsScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: kBg,
       appBar: AppBar(
         title: const Text('Viewed History'),
-        backgroundColor: Colors.transparent,
+        backgroundColor: kBg,
         elevation: 0,
         actions: [
           IconButton(
@@ -89,10 +89,10 @@ class _ViewedAuthorsScreenState extends State<ViewedAuthorsScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Colors.white))
+          ? const Center(child: CircularProgressIndicator(color: kAccent))
           : RefreshIndicator(
-              color: Colors.white,
-              backgroundColor: Colors.grey[900],
+              color: kAccent,
+              backgroundColor: kSurface,
               onRefresh: _fetchFeed,
               child: _history.isEmpty
                   ? SingleChildScrollView(
@@ -111,10 +111,11 @@ class _ViewedAuthorsScreenState extends State<ViewedAuthorsScreen> {
                         final entry = _history[index];
                         final profile = entry.profile;
                         return Card(
-                          color: Colors.grey[900],
+                          color: kSurface,
                           margin: const EdgeInsets.only(bottom: 10),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
+                            side: const BorderSide(color: kBorder),
                           ),
                           child: ListTile(
                             onTap: () => Navigator.of(context).push(
@@ -124,10 +125,10 @@ class _ViewedAuthorsScreenState extends State<ViewedAuthorsScreen> {
                               ),
                             ),
                             leading: CircleAvatar(
-                              backgroundColor: Colors.grey[800],
+                              backgroundColor: kBorder,
                               child: Icon(
                                 _actionIcon(entry.actionType),
-                                color: Colors.white70,
+                                color: kTextSecondary,
                                 size: 20,
                               ),
                             ),
@@ -135,12 +136,13 @@ class _ViewedAuthorsScreenState extends State<ViewedAuthorsScreen> {
                               profile.displayName,
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
+                                color: kTextPrimary,
                               ),
                             ),
                             subtitle: Text(
                               '@${profile.handle} · ${_actionLabel(entry.actionType)}'
                               '${entry.consumedAt != null ? ' · ${_formatTimestamp(entry.consumedAt)}' : ''}',
-                              style: const TextStyle(color: Colors.grey),
+                              style: kSubtitleText,
                             ),
                             trailing: const Icon(
                               Icons.arrow_forward_ios,
@@ -164,12 +166,16 @@ class _ViewedAuthorsScreenState extends State<ViewedAuthorsScreen> {
           const SizedBox(height: 16),
           const Text(
             'No Interaction History',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: kTextPrimary,
+            ),
           ),
           const SizedBox(height: 8),
           Text(
             'Authors you encounter in Discovery will appear here.',
-            style: TextStyle(color: Colors.grey[500]),
+            style: kSubtitleText,
           ),
         ],
       ),

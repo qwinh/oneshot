@@ -1,23 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../../models/prime_content.dart';
-import '../../models/relation.dart';
-import '../../models/work.dart';
-import '../../services/discovery_service.dart';
-import '../../services/relation_service.dart';
+import 'package:oneshot/models/prime_content.dart';
+import 'package:oneshot/models/relation.dart';
+import 'package:oneshot/models/work.dart';
+import 'package:oneshot/services/discovery_service.dart';
+import 'package:oneshot/services/relation_service.dart';
+import 'package:oneshot/theme/app_theme.dart';
 import '../discovery/prime_card.dart';
 
-/// Full profile view for a creator: their prime content plus their standard
-/// post feed (REQ-FUNC-021 — visible to any viewer who visits directly, not
-/// just subscribers), with Subscribe/Unsubscribe and Like/Unlike controls.
-///
-/// Reaching this screen — from a discovery card's "View Profile", from
-/// Search, or from the Viewed/Liked/Read-Later feeds — is always an
-/// ancillary action: it records a visit (REQ-FUNC-011) but never consumes
-/// the discovery chance (REQ-INT-002). Subscribing/unsubscribing here is
-/// likewise independent of the discovery mechanic (REQ-FUNC-012) — it does
-/// not touch discovery_consumed, which is set exclusively by the discovery
-/// card's own Subscribe/Next/Read Later actions.
 class ProfileScreen extends StatefulWidget {
   final String authorId;
 
@@ -54,9 +44,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
     });
 
     try {
-      final profile = await _discoveryService.getAuthorProfile(
-        widget.authorId,
-      );
+      final profile = await _discoveryService.getAuthorProfile(widget.authorId);
       final works = await _discoveryService.getAuthorWorks(widget.authorId);
 
       final user = FirebaseAuth.instance.currentUser;
@@ -66,8 +54,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
           user.uid,
           widget.authorId,
         );
-        // REQ-FUNC-011: record the visit for history; this never touches
-        // discovery_consumed.
         await _relationService.recordProfileVisit(
           viewerId: user.uid,
           authorId: widget.authorId,
@@ -95,8 +81,6 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
     final bool currentlySubscribed = _relation?.subscribed ?? false;
 
-    // REQ-FUNC-020(2): hidden authors do not accept new subscriptions.
-    // Existing subscribers are unaffected and may still unsubscribe.
     if (!currentlySubscribed && profile.hidden) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(
@@ -161,29 +145,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: kBg,
       appBar: AppBar(
         title: Text(_profile?.displayName ?? 'Profile'),
-        backgroundColor: Colors.transparent,
+        backgroundColor: kBg,
         elevation: 0,
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Colors.white))
+          ? const Center(child: CircularProgressIndicator(color: kAccent))
           : _errorMessage != null
-          ? Center(
-              child: Text(
-                _errorMessage!,
-                style: const TextStyle(color: Colors.grey),
-              ),
-            )
+          ? Center(child: Text(_errorMessage!, style: kSubtitleText))
           : _profile == null
           ? const Center(
               child: Text(
                 'This profile could not be found.',
-                style: TextStyle(color: Colors.grey),
+                style: TextStyle(color: kTextSecondary),
               ),
             )
           : RefreshIndicator(
               onRefresh: _load,
+              color: kAccent,
+              backgroundColor: kSurface,
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
@@ -201,21 +183,32 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       child: const Text(
                         'This creator has hidden their profile from new discovery. '
                         'Existing subscribers and history are preserved.',
-                        style: TextStyle(color: Colors.amberAccent, fontSize: 12),
+                        style: TextStyle(
+                          color: Colors.amberAccent,
+                          fontSize: 12,
+                        ),
                       ),
                     ),
                   if (!_isOwnProfile) _buildActionRow(),
                   const SizedBox(height: 16),
                   const Text(
                     'Prime Content',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: kTextPrimary,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   PrimeCard(profile: _profile!),
                   const SizedBox(height: 24),
                   const Text(
                     'Posts',
-                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13),
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 13,
+                      color: kTextPrimary,
+                    ),
                   ),
                   const SizedBox(height: 8),
                   if (_works.isEmpty)
@@ -223,20 +216,21 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       padding: EdgeInsets.symmetric(vertical: 12),
                       child: Text(
                         'No standard posts published yet.',
-                        style: TextStyle(color: Colors.grey, fontSize: 13),
+                        style: TextStyle(color: kTextSecondary, fontSize: 13),
                       ),
                     )
                   else
                     ..._works.map(
                       (work) => Card(
-                        color: Colors.grey[900],
+                        color: kSurface,
                         margin: const EdgeInsets.only(bottom: 10),
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(12),
+                          side: const BorderSide(color: kBorder),
                         ),
                         child: Padding(
                           padding: const EdgeInsets.all(14),
-                          child: Text(work.content),
+                          child: Text(work.content, style: kBodyText),
                         ),
                       ),
                     ),
@@ -258,7 +252,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
             icon: Icon(subscribed ? Icons.check : Icons.rss_feed),
             label: Text(subscribed ? 'Subscribed' : 'Subscribe'),
             style: OutlinedButton.styleFrom(
-              foregroundColor: subscribed ? Colors.greenAccent : Colors.white,
+              foregroundColor: subscribed ? kSuccess : kTextPrimary,
+              side: const BorderSide(color: kBorder),
             ),
           ),
         ),
@@ -266,7 +261,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
         OutlinedButton(
           onPressed: _isUpdatingRelation ? null : _toggleLiked,
           style: OutlinedButton.styleFrom(
-            foregroundColor: liked ? Colors.redAccent : Colors.white,
+            foregroundColor: liked ? Colors.redAccent : kTextPrimary,
+            side: const BorderSide(color: kBorder),
           ),
           child: Icon(liked ? Icons.favorite : Icons.favorite_border),
         ),

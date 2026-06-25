@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../models/prime_content.dart';
-import '../../services/discovery_service.dart';
+import 'package:oneshot/models/prime_content.dart';
+import 'package:oneshot/services/discovery_service.dart';
+import 'package:oneshot/theme/app_theme.dart';
 import '../profile/profile_screen.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -24,9 +25,7 @@ class _SearchScreenState extends State<SearchScreen> {
     setState(() => _isLoading = true);
     try {
       final list = await _discoveryService.searchAuthors(query);
-      setState(() {
-        _results = list;
-      });
+      setState(() => _results = list);
     } catch (e) {
       ScaffoldMessenger.of(
         context,
@@ -45,26 +44,28 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: kBg,
       appBar: AppBar(
         title: const Text('Search Authors'),
-        backgroundColor: Colors.transparent,
+        backgroundColor: kBg,
         elevation: 0,
       ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            // Search Input Row (REQ-FUNC-018)
             Row(
               children: [
                 Expanded(
                   child: TextField(
                     controller: _searchController,
-                    style: const TextStyle(color: Colors.white),
+                    style: const TextStyle(color: kTextPrimary),
                     decoration: InputDecoration(
                       hintText: 'Search handle or display name...',
+                      hintStyle: kSubtitleText,
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: kBorder),
                       ),
                       contentPadding: const EdgeInsets.symmetric(
                         horizontal: 16,
@@ -77,8 +78,8 @@ class _SearchScreenState extends State<SearchScreen> {
                 ElevatedButton(
                   onPressed: _executeSearch,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: Colors.black,
+                    backgroundColor: kTextPrimary,
+                    foregroundColor: kBg,
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
@@ -95,7 +96,7 @@ class _SearchScreenState extends State<SearchScreen> {
             Expanded(
               child: _isLoading
                   ? const Center(
-                      child: CircularProgressIndicator(color: Colors.white),
+                      child: CircularProgressIndicator(color: kAccent),
                     )
                   : _results.isEmpty
                   ? _buildEmptyState()
@@ -104,19 +105,24 @@ class _SearchScreenState extends State<SearchScreen> {
                       itemBuilder: (context, index) {
                         final profile = _results[index];
                         return Card(
-                          color: Colors.grey[900],
+                          color: kSurface,
                           margin: const EdgeInsets.only(bottom: 10),
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(12),
+                            side: const BorderSide(color: kBorder),
                           ),
                           child: ListTile(
                             title: Text(
                               profile.displayName,
                               style: const TextStyle(
                                 fontWeight: FontWeight.bold,
+                                color: kTextPrimary,
                               ),
                             ),
-                            subtitle: Text('@${profile.handle}'),
+                            subtitle: Text(
+                              '@${profile.handle}',
+                              style: kSubtitleText,
+                            ),
                             trailing: const Icon(
                               Icons.arrow_forward_ios,
                               size: 14,
@@ -140,15 +146,19 @@ class _SearchScreenState extends State<SearchScreen> {
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.search_off, size: 60, color: Colors.white24),
-          const SizedBox(height: 16),
+          SizedBox(height: 16),
           Text(
             'No Results Found',
-            style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: kTextPrimary,
+            ),
           ),
-          const SizedBox(height: 8),
+          SizedBox(height: 8),
           Text(
             'Enter an exact handle or displayName prefix to query.',
-            style: TextStyle(color: Colors.grey),
+            style: TextStyle(color: kTextSecondary),
           ),
         ],
       ),

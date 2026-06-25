@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
-import '../../models/prime_content.dart';
-import '../../widgets/image_grid.dart';
+import 'package:oneshot/models/prime_content.dart';
+import 'package:oneshot/theme/app_theme.dart';
+import 'package:oneshot/widgets/image_grid.dart';
 
 class PrimeCard extends StatelessWidget {
   final AuthorProfile profile;
@@ -11,26 +12,26 @@ class PrimeCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       decoration: BoxDecoration(
-        color: Colors.grey[900],
+        color: kSurface,
         borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-        border: Border.all(color: Colors.white10),
+        border: Border.all(color: kBorder),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          // Author Header block
+          // Author Header
           Padding(
             padding: const EdgeInsets.all(16.0),
             child: Row(
               children: [
                 CircleAvatar(
-                  backgroundColor: Colors.grey[800],
+                  backgroundColor: kBorder,
                   child: Text(
                     profile.displayName.isNotEmpty
                         ? profile.displayName[0].toUpperCase()
                         : '?',
                     style: const TextStyle(
-                      color: Colors.white,
+                      color: kTextPrimary,
                       fontWeight: FontWeight.bold,
                     ),
                   ),
@@ -45,20 +46,14 @@ class PrimeCard extends StatelessWidget {
                         style: const TextStyle(
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
+                          color: kTextPrimary,
                         ),
                       ),
                       const SizedBox(height: 2),
-                      Text(
-                        '@${profile.handle}',
-                        style: const TextStyle(
-                          color: Colors.grey,
-                          fontSize: 13,
-                        ),
-                      ),
+                      Text('@${profile.handle}', style: kSubtitleText),
                     ],
                   ),
                 ),
-                // Premium indicator
                 Container(
                   padding: const EdgeInsets.symmetric(
                     horizontal: 10,
@@ -81,9 +76,9 @@ class PrimeCard extends StatelessWidget {
               ],
             ),
           ),
-          const Divider(height: 1, color: Colors.white10),
+          const Divider(height: 1, color: kBorder),
 
-          // Core Prime Content (REQ-FUNC-003)
+          // Core Prime Content
           Padding(
             padding: const EdgeInsets.all(16),
             child: profile.primeBlocks.every((b) => b is TextBlock)
@@ -98,7 +93,7 @@ class PrimeCard extends StatelessWidget {
   Widget _buildTextPayload() {
     return Text(
       profile.primeBlocks.whereType<TextBlock>().map((b) => b.text).join('\n'),
-      style: const TextStyle(fontSize: 15, height: 1.5, color: Colors.white),
+      style: kBodyText,
     );
   }
 
@@ -112,7 +107,7 @@ class PrimeCard extends StatelessWidget {
         const Text(
           'Discovery Image Portfolio',
           style: TextStyle(
-            color: Colors.grey,
+            color: kTextSecondary,
             fontSize: 12,
             fontWeight: FontWeight.bold,
           ),

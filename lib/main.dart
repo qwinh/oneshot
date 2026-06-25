@@ -10,6 +10,7 @@ import 'package:oneshot/screens/feeds/subscribe_feed_screen.dart';
 import 'package:oneshot/screens/feeds/read_later_screen.dart';
 import 'package:oneshot/screens/feeds/viewed_authors_screen.dart';
 import 'package:oneshot/screens/feeds/liked_authors_screen.dart';
+import 'package:oneshot/theme/app_theme.dart';
 import 'firebase_options.dart';
 
 void main() async {
@@ -27,8 +28,47 @@ class OneShotApp extends StatelessWidget {
       title: 'OneShot',
       debugShowCheckedModeBanner: false,
       theme: ThemeData.dark().copyWith(
-        primaryColor: Colors.white,
-        scaffoldBackgroundColor: Colors.grey[950],
+        primaryColor: kTextPrimary,
+        scaffoldBackgroundColor: kBg,
+        appBarTheme: kAppBarTheme,
+        colorScheme: const ColorScheme.dark(
+          primary: kAccent,
+          secondary: kAccent,
+          surface: kSurface,
+        ),
+        inputDecorationTheme: InputDecorationTheme(
+          filled: true,
+          fillColor: kSurface,
+          border: OutlineInputBorder(
+            borderSide: const BorderSide(color: kBorder),
+          ),
+          enabledBorder: OutlineInputBorder(
+            borderSide: const BorderSide(color: kBorder),
+          ),
+          focusedBorder: OutlineInputBorder(
+            borderSide: const BorderSide(color: kAccent),
+          ),
+          labelStyle: const TextStyle(color: kTextSecondary),
+          hintStyle: const TextStyle(color: kTextSecondary),
+        ),
+        elevatedButtonTheme: ElevatedButtonThemeData(
+          style: ElevatedButton.styleFrom(
+            backgroundColor: kTextPrimary,
+            foregroundColor: kBg,
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
+        outlinedButtonTheme: OutlinedButtonThemeData(
+          style: OutlinedButton.styleFrom(
+            foregroundColor: kTextPrimary,
+            side: const BorderSide(color: kBorder),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(12),
+            ),
+          ),
+        ),
       ),
       home: const AuthGateRouter(),
     );
@@ -332,9 +372,7 @@ class _MockAuthenticatedHomeScreenState
                 onTap: () {
                   Navigator.of(context).pop();
                   Navigator.of(context).push(
-                    MaterialPageRoute(
-                      builder: (_) => const EditPrimeScreen(),
-                    ),
+                    MaterialPageRoute(builder: (_) => const EditPrimeScreen()),
                   );
                 },
               ),

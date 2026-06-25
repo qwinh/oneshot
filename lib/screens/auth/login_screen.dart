@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:oneshot/services/auth_service.dart';
 import 'package:oneshot/screens/auth/register_screen.dart';
+import 'package:oneshot/theme/app_theme.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -39,7 +40,6 @@ class _LoginScreenState extends State<LoginScreen> {
         email: _emailController.text.trim(),
         password: _passwordController.text.trim(),
       );
-      // Main.dart stream handles successful transition automatically
     } catch (e) {
       setState(() {
         _errorMessage = e.toString().replaceFirst(RegExp(r'\[.*?\]\s*'), '');
@@ -56,7 +56,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.grey[900],
+      backgroundColor: kBg,
       body: Center(
         child: SingleChildScrollView(
           padding: const EdgeInsets.symmetric(horizontal: 24.0),
@@ -66,11 +66,10 @@ class _LoginScreenState extends State<LoginScreen> {
               mainAxisAlignment: MainAxisAlignment.center,
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                // Minimal branding
                 const Icon(
                   Icons.adjust_outlined,
                   size: 80,
-                  color: Colors.white,
+                  color: kTextPrimary,
                 ),
                 const SizedBox(height: 16),
                 const Text(
@@ -80,62 +79,55 @@ class _LoginScreenState extends State<LoginScreen> {
                     fontSize: 28,
                     fontWeight: FontWeight.bold,
                     letterSpacing: 2,
-                    color: Colors.white,
+                    color: kTextPrimary,
                   ),
                 ),
                 const SizedBox(height: 8),
                 Text(
                   'Scarcity-First Content Platform',
                   textAlign: TextAlign.center,
-                  style: TextStyle(fontSize: 14, color: Colors.grey[400]),
+                  style: kSubtitleText,
                 ),
                 const SizedBox(height: 48),
 
-                // Error Message Notice
                 if (_errorMessage != null) ...[
                   Container(
                     padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.redAccent.withOpacity(0.15),
+                      color: kDestructive.withOpacity(0.15),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: Colors.redAccent.withOpacity(0.5),
-                      ),
+                      border: Border.all(color: kDestructive.withOpacity(0.5)),
                     ),
                     child: Text(
                       _errorMessage!,
-                      style: const TextStyle(
-                        color: Colors.redAccent,
-                        fontSize: 13,
-                      ),
+                      style: const TextStyle(color: kDestructive, fontSize: 13),
                       textAlign: TextAlign.center,
                     ),
                   ),
                   const SizedBox(height: 16),
                 ],
 
-                // Email
                 TextFormField(
                   controller: _emailController,
                   keyboardType: TextInputType.emailAddress,
-                  style: const TextStyle(color: Colors.white),
+                  style: const TextStyle(color: kTextPrimary),
                   decoration: InputDecoration(
                     labelText: 'Email Address',
-                    labelStyle: TextStyle(color: Colors.grey[400]),
+                    labelStyle: kSubtitleText,
                     enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.grey[700]!),
+                      borderSide: const BorderSide(color: kBorder),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderSide: const BorderSide(color: Colors.white),
+                      borderSide: const BorderSide(color: kAccent),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     errorBorder: OutlineInputBorder(
-                      borderSide: const BorderSide(color: Colors.redAccent),
+                      borderSide: const BorderSide(color: kDestructive),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     focusedErrorBorder: OutlineInputBorder(
-                      borderSide: const BorderSide(color: Colors.redAccent),
+                      borderSide: const BorderSide(color: kDestructive),
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
@@ -152,28 +144,27 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 16),
 
-                // Password
                 TextFormField(
                   controller: _passwordController,
                   obscureText: true,
-                  style: const TextStyle(color: Colors.white),
+                  style: const TextStyle(color: kTextPrimary),
                   decoration: InputDecoration(
                     labelText: 'Password',
-                    labelStyle: TextStyle(color: Colors.grey[400]),
+                    labelStyle: kSubtitleText,
                     enabledBorder: OutlineInputBorder(
-                      borderSide: BorderSide(color: Colors.grey[700]!),
+                      borderSide: const BorderSide(color: kBorder),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     focusedBorder: OutlineInputBorder(
-                      borderSide: const BorderSide(color: Colors.white),
+                      borderSide: const BorderSide(color: kAccent),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     errorBorder: OutlineInputBorder(
-                      borderSide: const BorderSide(color: Colors.redAccent),
+                      borderSide: const BorderSide(color: kDestructive),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     focusedErrorBorder: OutlineInputBorder(
-                      borderSide: const BorderSide(color: Colors.redAccent),
+                      borderSide: const BorderSide(color: kDestructive),
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
@@ -187,12 +178,11 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // Login Button
                 ElevatedButton(
                   onPressed: _isLoading ? null : _handleLogin,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: Colors.black,
+                    backgroundColor: kTextPrimary,
+                    foregroundColor: kBg,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -205,7 +195,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           width: 20,
                           child: CircularProgressIndicator(
                             strokeWidth: 2,
-                            color: Colors.black,
+                            color: kBg,
                           ),
                         )
                       : const Text(
@@ -218,14 +208,10 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
                 const SizedBox(height: 24),
 
-                // Switch To Register Route
                 Row(
                   mainAxisAlignment: MainAxisAlignment.center,
                   children: [
-                    Text(
-                      "Don't have an account? ",
-                      style: TextStyle(color: Colors.grey[400]),
-                    ),
+                    Text("Don't have an account? ", style: kSubtitleText),
                     GestureDetector(
                       onTap: () {
                         Navigator.of(context).push(
@@ -237,7 +223,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       child: const Text(
                         'Register',
                         style: TextStyle(
-                          color: Colors.white,
+                          color: kAccent,
                           fontWeight: FontWeight.bold,
                           decoration: TextDecoration.underline,
                         ),
