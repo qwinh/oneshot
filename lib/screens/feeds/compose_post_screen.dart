@@ -1,6 +1,7 @@
 import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:oneshot/models/prime_content.dart';
 import 'package:oneshot/services/discovery_service.dart';
 import 'package:oneshot/services/storage_service.dart';
@@ -75,7 +76,7 @@ class _ComposePostScreenState extends State<ComposePostScreen> {
     }
   }
 
-  Future<void> _simulateImageUploadAt(int insertAfterIndex) async {
+  Future<void> _pickAndUploadImageAt(int insertAfterIndex) async {
     if (_imageCount >= 4) {
       _showSnack('Maximum 4 images allowed.', isError: true);
       return;
@@ -83,102 +84,45 @@ class _ComposePostScreenState extends State<ComposePostScreen> {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
+    // Let the user pick an image from their gallery.
+    final picker = ImagePicker();
+    final XFile? picked = await picker.pickImage(
+      source: ImageSource.gallery,
+      imageQuality: 85,
+    );
+    if (picked == null) return; // user cancelled
+
+    final Uint8List bytes = await picked.readAsBytes();
+    final String fileName =
+        'post_${user.uid}_${DateTime.now().millisecondsSinceEpoch}'
+        '${picked.name.contains('.') ? picked.name.substring(picked.name.lastIndexOf('.')) : '.jpg'}';
+
+    // Optimistically insert a placeholder so the user sees feedback immediately.
     setState(() {
       _blocks.insert(insertAfterIndex + 1, const ImageBlock(url: '', name: ''));
       _flushTextControllers();
     });
 
     try {
-      // Minimal 1x1 PNG
-      final Uint8List bytes = Uint8List.fromList([
-        137,
-        80,
-        78,
-        71,
-        13,
-        10,
-        26,
-        10,
-        0,
-        0,
-        0,
-        13,
-        73,
-        72,
-        68,
-        82,
-        0,
-        0,
-        0,
-        1,
-        0,
-        0,
-        0,
-        1,
-        8,
-        6,
-        0,
-        0,
-        0,
-        31,
-        21,
-        204,
-        137,
-        0,
-        0,
-        0,
-        13,
-        73,
-        68,
-        65,
-        84,
-        120,
-        156,
-        99,
-        96,
-        0,
-        1,
-        0,
-        0,
-        5,
-        0,
-        1,
-        13,
-        10,
-        45,
-        180,
-        0,
-        0,
-        0,
-        0,
-        73,
-        69,
-        78,
-        68,
-        174,
-        66,
-        96,
-        130,
-      ]);
-      final fileName = 'post_${DateTime.now().millisecondsSinceEpoch}.png';
       final url = await _storageService.uploadPrimeImage(
         authorId: user.uid,
         fileName: fileName,
         bytes: bytes,
       );
 
-      final realIndex = _blocks.indexWhere(
+      final placeholderIndex = _blocks.indexWhere(
         (b) => b is ImageBlock && (b as ImageBlock).url.isEmpty,
       );
-      if (realIndex != -1 && mounted) {
+      if (placeholderIndex != -1 && mounted) {
         setState(() {
-          _blocks[realIndex] = ImageBlock(
+          _blocks[placeholderIndex] = ImageBlock(
             url: url,
-            name: 'Image ${_imageCount}',
+            name: 'Image $_imageCount',
           );
         });
       }
     } catch (e) {
+      // Remove the placeholder on failure.
       setState(() {
         _blocks.removeWhere(
           (b) => b is ImageBlock && (b as ImageBlock).url.isEmpty,
@@ -477,7 +421,7 @@ class _ComposePostScreenState extends State<ComposePostScreen> {
             icon: Icons.add_photo_alternate_outlined,
             label: 'Image',
             disabled: _imageCount >= 4,
-            onTap: () => _simulateImageUploadAt(afterIndex),
+            onTap: () => _pickAndUploadImageAt(afterIndex),
           ),
           const SizedBox(width: 8),
           if (afterIndex < _blocks.length - 1 ||
