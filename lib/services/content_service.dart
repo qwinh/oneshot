@@ -65,7 +65,7 @@ class ContentService {
           'authorId': profile.uid,
           'handle': profile.handle,
           'displayName': profile.displayName,
-          'prime_content_type': profile.primeContentType.toValueString(),
+          'prime_content_type': profile.contentTypeString,
           'updated_at': FieldValue.serverTimestamp(),
         });
       }

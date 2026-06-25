@@ -5,6 +5,21 @@ import '../../models/prime_content.dart';
 import '../../services/content_service.dart';
 import '../../services/storage_service.dart';
 
+// ─────────────────────────────────────────────────────────────────────────────
+// Design tokens
+// ─────────────────────────────────────────────────────────────────────────────
+const _bg = Color(0xFF000000);
+const _surface = Color(0xFF0F0F0F);
+const _border = Color(0xFF2F2F2F);
+const _textPrimary = Color(0xFFE7E9EA);
+const _textSecondary = Color(0xFF71767B);
+const _accent = Color(0xFF1D9BF0); // X blue
+const _destructive = Color(0xFFFF4242);
+
+// ─────────────────────────────────────────────────────────────────────────────
+// EditPrimeScreen
+// ─────────────────────────────────────────────────────────────────────────────
+
 class EditPrimeScreen extends StatefulWidget {
   const EditPrimeScreen({super.key});
 
@@ -15,21 +30,22 @@ class EditPrimeScreen extends StatefulWidget {
 class _EditPrimeScreenState extends State<EditPrimeScreen> {
   final ContentService _contentService = ContentService();
   final StorageService _storageService = StorageService();
-  final _formKey = GlobalKey<FormState>();
 
   final TextEditingController _handleController = TextEditingController();
   final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _textController = TextEditingController();
   final TextEditingController _tagsController = TextEditingController();
 
-  PrimeContentType _contentType = PrimeContentType.text;
-  List<PrimeImage> _images = [];
-  bool _isLoading = false;
-  bool _isUploading = false;
-  String? _errorMessage;
+  /// Ordered list of content blocks — the source of truth for the editor.
+  List<PrimeBlock> _blocks = [const TextBlock(text: '')];
 
-  // State preservation to prevent overwriting original creation date
+  bool _isLoading = true;
+  bool _isSaving = false;
+  String? _errorMessage;
   DateTime? _existingCreatedAt;
+
+  // Per-block TextEditingControllers keyed by a stable block index.
+  // Rebuilt whenever blocks are added/removed.
+  final Map<int, TextEditingController> _textControllers = {};
 
   @override
   void initState() {
@@ -41,55 +57,110 @@ class _EditPrimeScreenState extends State<EditPrimeScreen> {
   void dispose() {
     _handleController.dispose();
     _nameController.dispose();
-    _textController.dispose();
     _tagsController.dispose();
+    for (final c in _textControllers.values) {
+      c.dispose();
+    }
     super.dispose();
   }
 
-  Future<void> _loadExistingProfile() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+  // ── Helpers ─────────────────────────────────────────────────────────────────
 
-    setState(() => _isLoading = true);
-    try {
-      final profile = await _contentService.getProfile(user.uid);
-      if (profile != null) {
-        _handleController.text = profile.handle;
-        _nameController.text = profile.displayName;
-        _contentType = profile.primeContentType;
-        _textController.text = profile.textPayload ?? '';
-        _images = List.from(profile.images);
-        _tagsController.text = profile.tags.join(', ');
-        // Safely cache original document creation date
-        _existingCreatedAt = profile.createdAt;
-      }
-    } catch (e) {
-      _errorMessage = 'Failed to load profile data.';
-    } finally {
-      setState(() => _isLoading = false);
+  int get _imageCount => _blocks.whereType<ImageBlock>().length;
+
+  /// Returns or creates a TextEditingController for block at [index].
+  TextEditingController _controllerFor(int index, String initialText) {
+    return _textControllers.putIfAbsent(
+      index,
+      () => TextEditingController(text: initialText),
+    );
+  }
+
+  void _flushTextControllers() {
+    // Rebuild controller map to match current block list length.
+    final stale = _textControllers.keys
+        .where((k) => k >= _blocks.length)
+        .toList();
+    for (final k in stale) {
+      _textControllers[k]?.dispose();
+      _textControllers.remove(k);
     }
   }
 
-  /// Simulation utility that generates a solid block color JPG/PNG representation to
-  /// test Firebase Storage upload rules instantly without needing an external File Picker package.
-  Future<void> _simulateImageUpload() async {
-    if (_images.length >= 4) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Scarcity rule: Maximum 4 discovery images allowed.'),
-        ),
-      );
+  // ── Data load ────────────────────────────────────────────────────────────────
+
+  Future<void> _loadExistingProfile() async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      setState(() => _isLoading = false);
       return;
     }
+    try {
+      final profile = await _contentService.getProfile(user.uid);
+      if (profile != null && mounted) {
+        setState(() {
+          _handleController.text = profile.handle;
+          _nameController.text = profile.displayName;
+          _tagsController.text = profile.tags.join(', ');
+          _existingCreatedAt = profile.createdAt;
+          _blocks = profile.primeBlocks.isNotEmpty
+              ? List.from(profile.primeBlocks)
+              : [const TextBlock(text: '')];
+        });
+      }
+    } catch (_) {
+      if (mounted) setState(() => _errorMessage = 'Could not load profile.');
+    } finally {
+      if (mounted) setState(() => _isLoading = false);
+    }
+  }
 
+  // ── Block mutations ──────────────────────────────────────────────────────────
+
+  void _insertTextBlockAt(int index) {
+    setState(() {
+      _blocks.insert(index, const TextBlock(text: ''));
+      _flushTextControllers();
+    });
+  }
+
+  void _removeBlockAt(int index) {
+    setState(() {
+      _blocks.removeAt(index);
+      _flushTextControllers();
+      if (_blocks.isEmpty) _blocks.add(const TextBlock(text: ''));
+    });
+  }
+
+  void _updateTextBlock(int index, String value) {
+    _blocks[index] = TextBlock(text: value);
+    // No setState — controller drives the text field, no visual rebuild needed.
+  }
+
+  void _renameImageBlock(int index, String name) {
+    final block = _blocks[index];
+    if (block is ImageBlock) {
+      setState(() => _blocks[index] = block.copyWith(name: name));
+    }
+  }
+
+  Future<void> _simulateImageUploadAt(int insertAfterIndex) async {
+    if (_imageCount >= 4) {
+      _showSnack('Maximum 4 images allowed.', isError: true);
+      return;
+    }
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    setState(() => _isUploading = true);
+    // Optimistically insert a placeholder so the user sees feedback.
+    setState(() {
+      _blocks.insert(insertAfterIndex + 1, const ImageBlock(url: '', name: ''));
+      _flushTextControllers();
+    });
 
     try {
-      // 1. Generate an interactive mock byte structure representing an image (1x1 transparent/color png)
-      final Uint8List mockImageBytes = Uint8List.fromList([
+      // Minimal valid 1×1 PNG
+      final Uint8List bytes = Uint8List.fromList([
         137,
         80,
         78,
@@ -160,60 +231,93 @@ class _EditPrimeScreenState extends State<EditPrimeScreen> {
         130,
       ]);
 
-      final String fileId = 'mock_${DateTime.now().millisecondsSinceEpoch}.png';
-
-      // 2. Real transmission to cloud storage bucket
-      final String uploadedUrl = await _storageService.uploadPrimeImage(
+      final fileName = 'mock_${DateTime.now().millisecondsSinceEpoch}.png';
+      final url = await _storageService.uploadPrimeImage(
         authorId: user.uid,
-        fileName: fileId,
-        bytes: mockImageBytes,
+        fileName: fileName,
+        bytes: bytes,
       );
 
-      setState(() {
-        _images.add(
-          PrimeImage(url: uploadedUrl, name: 'Image ${_images.length + 1}'),
-        );
-      });
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Mock upload failed: ${e.toString()}')),
+      final realIndex = _blocks.indexWhere(
+        (b) => b is ImageBlock && (b as ImageBlock).url.isEmpty,
       );
-    } finally {
-      setState(() => _isUploading = false);
+      if (realIndex != -1 && mounted) {
+        setState(() {
+          _blocks[realIndex] = ImageBlock(
+            url: url,
+            name: 'Image ${_imageCount}',
+          );
+        });
+      }
+    } catch (e) {
+      // Remove placeholder on failure
+      setState(() {
+        _blocks.removeWhere(
+          (b) => b is ImageBlock && (b as ImageBlock).url.isEmpty,
+        );
+        _flushTextControllers();
+      });
+      _showSnack('Upload failed: $e', isError: true);
     }
   }
 
-  void _removeUploadedImage(int index) async {
-    final String url = _images[index].url;
+  void _removeImageBlock(int index) async {
+    final block = _blocks[index] as ImageBlock;
     setState(() {
-      _images.removeAt(index);
+      _blocks.removeAt(index);
+      _flushTextControllers();
     });
-    // Fire-and-forget deletion from active bucket
-    await _storageService.deleteImageByUrl(url);
+    if (block.url.isNotEmpty) {
+      await _storageService.deleteImageByUrl(block.url);
+    }
   }
 
-  /// REQ-FUNC-003: each image in the set has an associated name.
-  void _renameImage(int index, String newName) {
-    setState(() {
-      _images[index] = _images[index].copyWith(name: newName);
-    });
-  }
+  // ── Save ─────────────────────────────────────────────────────────────────────
 
-  Future<void> _saveProfile() async {
-    if (!_formKey.currentState!.validate()) return;
+  Future<void> _save() async {
+    final handle = _handleController.text.trim();
+    final displayName = _nameController.text.trim();
 
-    if (_contentType == PrimeContentType.imageSet && _images.isEmpty) {
-      setState(() => _errorMessage = 'Please upload at least one image.');
+    if (handle.isEmpty) {
+      setState(() => _errorMessage = 'Handle is required.');
+      return;
+    }
+    if (handle.contains(' ')) {
+      setState(() => _errorMessage = 'Handle cannot contain spaces.');
+      return;
+    }
+    if (displayName.isEmpty) {
+      setState(() => _errorMessage = 'Display name is required.');
+      return;
+    }
+
+    // Flush text block values from controllers into _blocks before save.
+    for (final entry in _textControllers.entries) {
+      final i = entry.key;
+      if (i < _blocks.length && _blocks[i] is TextBlock) {
+        _blocks[i] = TextBlock(text: entry.value.text);
+      }
+    }
+
+    // Strip blank trailing text blocks.
+    final trimmedBlocks = _blocks
+        .where((b) => b is ImageBlock || (b as TextBlock).text.isNotEmpty)
+        .toList();
+
+    if (trimmedBlocks.isEmpty) {
+      setState(() => _errorMessage = 'Add some content before publishing.');
       return;
     }
 
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return;
 
-    setState(() => _isLoading = true);
+    setState(() {
+      _isSaving = true;
+      _errorMessage = null;
+    });
 
-    // Normalize comma separated tags safely
-    final List<String> parsedTags = _tagsController.text
+    final parsedTags = _tagsController.text
         .split(',')
         .map((s) => s.trim().toLowerCase())
         .where((s) => s.isNotEmpty)
@@ -221,337 +325,509 @@ class _EditPrimeScreenState extends State<EditPrimeScreen> {
 
     final profile = AuthorProfile(
       uid: user.uid,
-      handle: _handleController.text.trim(),
-      displayName: _nameController.text.trim(),
-      primeContentType: _contentType,
-      textPayload: _contentType == PrimeContentType.text
-          ? _textController.text.trim()
-          : null,
-      images: _contentType == PrimeContentType.imageSet ? _images : [],
+      handle: handle,
+      displayName: displayName,
+      primeBlocks: trimmedBlocks,
       tags: parsedTags,
       hidden: false,
-      // Preserves original creation date, fall back to now only if first-time save
       createdAt: _existingCreatedAt ?? DateTime.now(),
     );
 
     try {
       await _contentService.saveAuthorProfile(profile);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Prime profile successfully published!'),
-          ),
-        );
+        _showSnack('Published.');
         Navigator.of(context).pop();
       }
     } catch (e) {
       setState(() => _errorMessage = e.toString());
     } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
+      if (mounted) setState(() => _isSaving = false);
     }
   }
+
+  // ── Snack ────────────────────────────────────────────────────────────────────
+
+  void _showSnack(String message, {bool isError = false}) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(message, style: const TextStyle(color: _textPrimary)),
+        backgroundColor: isError ? _destructive : _surface,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+          side: BorderSide(color: _border),
+        ),
+      ),
+    );
+  }
+
+  // ── Build ────────────────────────────────────────────────────────────────────
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(
-        title: const Text('Configure Discovery Prime'),
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-      ),
+      backgroundColor: _bg,
+      appBar: _buildAppBar(),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator(color: Colors.white))
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(24.0),
-              child: Form(
-                key: _formKey,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+          ? const Center(child: CircularProgressIndicator(color: _accent))
+          : _buildBody(),
+    );
+  }
+
+  AppBar _buildAppBar() {
+    return AppBar(
+      backgroundColor: _bg,
+      surfaceTintColor: Colors.transparent,
+      elevation: 0,
+      leading: IconButton(
+        icon: const Icon(Icons.close, color: _textPrimary),
+        onPressed: () => Navigator.of(context).pop(),
+      ),
+      title: const Text(
+        'Edit prime',
+        style: TextStyle(
+          color: _textPrimary,
+          fontSize: 17,
+          fontWeight: FontWeight.w700,
+        ),
+      ),
+      actions: [
+        Padding(
+          padding: const EdgeInsets.only(right: 16, top: 8, bottom: 8),
+          child: FilledButton(
+            onPressed: _isSaving ? null : _save,
+            style: FilledButton.styleFrom(
+              backgroundColor: _textPrimary,
+              foregroundColor: _bg,
+              disabledBackgroundColor: _border,
+              shape: StadiumBorder(),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
+              textStyle: const TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 15,
+              ),
+            ),
+            child: _isSaving
+                ? const SizedBox(
+                    width: 16,
+                    height: 16,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      color: _bg,
+                    ),
+                  )
+                : const Text('Publish'),
+          ),
+        ),
+      ],
+      bottom: PreferredSize(
+        preferredSize: const Size.fromHeight(1),
+        child: Container(height: 1, color: _border),
+      ),
+    );
+  }
+
+  Widget _buildBody() {
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Error banner
+          if (_errorMessage != null)
+            Container(
+              margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: _destructive.withOpacity(0.12),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: _destructive.withOpacity(0.4)),
+              ),
+              child: Text(
+                _errorMessage!,
+                style: const TextStyle(color: _destructive, fontSize: 13),
+              ),
+            ),
+
+          // Identity row
+          _buildIdentitySection(),
+
+          Divider(height: 1, color: _border),
+
+          // Composer area (avatar + blocks)
+          _buildComposerSection(),
+
+          // Tags
+          _buildTagsSection(),
+
+          const SizedBox(height: 80),
+        ],
+      ),
+    );
+  }
+
+  // ── Identity ─────────────────────────────────────────────────────────────────
+
+  Widget _buildIdentitySection() {
+    return Padding(
+      padding: const EdgeInsets.all(16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Avatar placeholder
+          CircleAvatar(
+            radius: 20,
+            backgroundColor: _surface,
+            child: const Icon(Icons.person, color: _textSecondary, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                _XTextField(
+                  controller: _nameController,
+                  hint: 'Display name',
+                  style: const TextStyle(
+                    color: _textPrimary,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Row(
                   children: [
-                    if (_errorMessage != null) ...[
-                      Text(
-                        _errorMessage!,
-                        style: const TextStyle(color: Colors.redAccent),
-                        textAlign: TextAlign.center,
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-
-                    // Profile identity section
-                    TextFormField(
-                      controller: _handleController,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(
-                        labelText: 'Unique Author Handle (e.g., johndoe)',
-                        prefixText: '@ ',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (val) {
-                        if (val == null || val.isEmpty)
-                          return 'Handle is required';
-                        if (val.contains(' '))
-                          return 'Handle cannot contain spaces';
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    TextFormField(
-                      controller: _nameController,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(
-                        labelText: 'Display Name',
-                        border: OutlineInputBorder(),
-                      ),
-                      validator: (val) {
-                        if (val == null || val.isEmpty)
-                          return 'Display Name is required';
-                        return null;
-                      },
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Scarcity Content Type selector
                     const Text(
-                      'Prime Discovery Content Type',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
+                      '@',
+                      style: TextStyle(color: _textSecondary, fontSize: 14),
                     ),
-                    const SizedBox(height: 12),
-                    Row(
-                      children: [
-                        Expanded(
-                          child: ChoiceChip(
-                            label: const Text('Text Post / Link'),
-                            selected: _contentType == PrimeContentType.text,
-                            onSelected: (selected) {
-                              if (selected)
-                                setState(
-                                  () => _contentType = PrimeContentType.text,
-                                );
-                            },
-                          ),
+                    Expanded(
+                      child: _XTextField(
+                        controller: _handleController,
+                        hint: 'handle',
+                        style: const TextStyle(
+                          color: _textSecondary,
+                          fontSize: 14,
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: ChoiceChip(
-                            label: const Text('Image Set (1-4)'),
-                            selected: _contentType == PrimeContentType.imageSet,
-                            onSelected: (selected) {
-                              if (selected)
-                                setState(
-                                  () =>
-                                      _contentType = PrimeContentType.imageSet,
-                                );
-                            },
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 24),
-
-                    // Form bodies conditional on selection
-                    if (_contentType == PrimeContentType.text) ...[
-                      TextFormField(
-                        controller: _textController,
-                        maxLines: 8,
-                        maxLength: 1000,
-                        style: const TextStyle(color: Colors.white),
-                        decoration: const InputDecoration(
-                          labelText:
-                              'Write your prime text or insert discovery link...',
-                          alignLabelWithHint: true,
-                          border: OutlineInputBorder(),
-                        ),
-                        validator: (val) {
-                          if (_contentType == PrimeContentType.text &&
-                              (val == null || val.isEmpty)) {
-                            return 'Content body cannot be blank';
-                          }
-                          return null;
-                        },
-                      ),
-                    ] else ...[
-                      Container(
-                        padding: const EdgeInsets.all(16),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[900],
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text(
-                                  'Prime Image Gallery (${_images.length}/4)',
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                if (_isUploading)
-                                  const SizedBox(
-                                    width: 16,
-                                    height: 16,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
-                                  )
-                                else if (_images.length < 4)
-                                  TextButton.icon(
-                                    onPressed: _simulateImageUpload,
-                                    icon: const Icon(
-                                      Icons.add_photo_alternate,
-                                      size: 18,
-                                    ),
-                                    label: const Text('Simulate Upload'),
-                                  ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            if (_images.isEmpty)
-                              const Text(
-                                'No images uploaded yet. Simulating adds a sample asset to cloud storage.',
-                                style: TextStyle(
-                                  color: Colors.grey,
-                                  fontSize: 13,
-                                ),
-                              )
-                            else
-                              GridView.builder(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                gridDelegate:
-                                    const SliverGridDelegateWithFixedCrossAxisCount(
-                                      crossAxisCount: 2,
-                                      crossAxisSpacing: 10,
-                                      mainAxisSpacing: 10,
-                                      childAspectRatio: 0.85,
-                                    ),
-                                itemCount: _images.length,
-                                itemBuilder: (context, idx) {
-                                  return Column(
-                                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                                    children: [
-                                      Expanded(
-                                        child: Stack(
-                                          children: [
-                                            Positioned.fill(
-                                              child: ClipRRect(
-                                                borderRadius:
-                                                    BorderRadius.circular(8),
-                                                child: Image.network(
-                                                  _images[idx].url,
-                                                  fit: BoxFit.cover,
-                                                  errorBuilder:
-                                                      (
-                                                        context,
-                                                        error,
-                                                        stackTrace,
-                                                      ) {
-                                                        return Container(
-                                                          color: Colors
-                                                              .blueGrey[800],
-                                                          child: const Icon(
-                                                            Icons.broken_image,
-                                                            color:
-                                                                Colors.white,
-                                                          ),
-                                                        );
-                                                      },
-                                                ),
-                                              ),
-                                            ),
-                                            Positioned(
-                                              right: 4,
-                                              top: 4,
-                                              child: CircleAvatar(
-                                                radius: 14,
-                                                backgroundColor: Colors.black
-                                                    .withOpacity(0.7),
-                                                child: IconButton(
-                                                  icon: const Icon(
-                                                    Icons.close,
-                                                    size: 12,
-                                                    color: Colors.white,
-                                                  ),
-                                                  onPressed: () =>
-                                                      _removeUploadedImage(
-                                                        idx,
-                                                      ),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      // REQ-FUNC-003: each image carries an associated name.
-                                      TextFormField(
-                                        key: ValueKey(
-                                          'image_name_${idx}_${_images[idx].url}',
-                                        ),
-                                        initialValue: _images[idx].name,
-                                        style: const TextStyle(fontSize: 12),
-                                        decoration: const InputDecoration(
-                                          isDense: true,
-                                          hintText: 'Image name',
-                                          border: OutlineInputBorder(),
-                                          contentPadding: EdgeInsets.symmetric(
-                                            horizontal: 8,
-                                            vertical: 8,
-                                          ),
-                                        ),
-                                        onChanged: (val) =>
-                                            _renameImage(idx, val),
-                                      ),
-                                    ],
-                                  );
-                                },
-                              ),
-                          ],
-                        ),
-                      ),
-                    ],
-                    const SizedBox(height: 24),
-
-                    // Categorization Tags
-                    TextFormField(
-                      controller: _tagsController,
-                      style: const TextStyle(color: Colors.white),
-                      decoration: const InputDecoration(
-                        labelText:
-                            'Tags (comma separated, e.g., poetry, sci-fi, photography)',
-                        border: OutlineInputBorder(),
-                      ),
-                    ),
-                    const SizedBox(height: 36),
-
-                    // Save Action Row
-                    ElevatedButton(
-                      onPressed: _saveProfile,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.white,
-                        foregroundColor: Colors.black,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                      ),
-                      child: const Text(
-                        'Publish Prime Content',
-                        style: TextStyle(fontWeight: FontWeight.bold),
                       ),
                     ),
                   ],
                 ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Composer ─────────────────────────────────────────────────────────────────
+
+  Widget _buildComposerSection() {
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Left gutter: thin vertical line like X's thread line
+          Column(
+            children: [
+              const SizedBox(height: 4),
+              Container(
+                width: 2,
+                height: _blocks.length > 1 ? null : 0,
+                // Stretches naturally inside the Column
+              ),
+            ],
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                for (int i = 0; i < _blocks.length; i++) ...[
+                  _buildBlock(i),
+                  _buildInsertRow(i),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBlock(int index) {
+    final block = _blocks[index];
+    if (block is TextBlock) return _buildTextBlock(index, block);
+    if (block is ImageBlock) return _buildImageBlock(index, block);
+    return const SizedBox.shrink();
+  }
+
+  Widget _buildTextBlock(int index, TextBlock block) {
+    final controller = _controllerFor(index, block.text);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 4),
+      child: TextField(
+        controller: controller,
+        maxLines: null,
+        minLines: 2,
+        style: const TextStyle(color: _textPrimary, fontSize: 17, height: 1.4),
+        decoration: InputDecoration(
+          hintText: index == 0 ? "What's on your prime?" : 'Continue writing…',
+          hintStyle: const TextStyle(color: _textSecondary, fontSize: 17),
+          border: InputBorder.none,
+          isDense: true,
+          contentPadding: EdgeInsets.zero,
+        ),
+        onChanged: (v) => _updateTextBlock(index, v),
+      ),
+    );
+  }
+
+  Widget _buildImageBlock(int index, ImageBlock block) {
+    final isUploading = block.url.isEmpty;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // Image tile
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: AspectRatio(
+              aspectRatio: 16 / 9,
+              child: Stack(
+                fit: StackFit.expand,
+                children: [
+                  if (isUploading)
+                    Container(
+                      color: _surface,
+                      child: const Center(
+                        child: CircularProgressIndicator(color: _accent),
+                      ),
+                    )
+                  else
+                    Image.network(
+                      block.url,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: _surface,
+                        child: const Center(
+                          child: Icon(
+                            Icons.broken_image_outlined,
+                            color: _textSecondary,
+                          ),
+                        ),
+                      ),
+                    ),
+                  // Remove button
+                  if (!isUploading)
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: GestureDetector(
+                        onTap: () => _removeImageBlock(index),
+                        child: Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.65),
+                            shape: BoxShape.circle,
+                          ),
+                          child: const Icon(
+                            Icons.close,
+                            size: 16,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
+          ),
+          // Image name field
+          if (!isUploading)
+            Padding(
+              padding: const EdgeInsets.only(top: 6),
+              child: _XTextField(
+                initialValue: block.name,
+                hint: 'Add image name…',
+                style: const TextStyle(color: _textSecondary, fontSize: 13),
+                onChanged: (v) => _renameImageBlock(index, v),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
+  /// Thin action row between blocks: add text or add image.
+  Widget _buildInsertRow(int afterIndex) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          _InsertChip(
+            icon: Icons.add_photo_alternate_outlined,
+            label: 'Image',
+            disabled: _imageCount >= 4,
+            onTap: () => _simulateImageUploadAt(afterIndex),
+          ),
+          const SizedBox(width: 8),
+          if (afterIndex < _blocks.length - 1 ||
+              _blocks[afterIndex] is ImageBlock)
+            _InsertChip(
+              icon: Icons.text_fields_outlined,
+              label: 'Text',
+              onTap: () => _insertTextBlockAt(afterIndex + 1),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // ── Tags ─────────────────────────────────────────────────────────────────────
+
+  Widget _buildTagsSection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Divider(height: 1, color: _border),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 14, 16, 4),
+          child: Row(
+            children: const [
+              Icon(Icons.tag, size: 16, color: _textSecondary),
+              SizedBox(width: 6),
+              Text(
+                'Tags',
+                style: TextStyle(
+                  color: _textSecondary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+          child: _XTextField(
+            controller: _tagsController,
+            hint: 'poetry, sci-fi, photography…',
+            style: const TextStyle(color: _textPrimary, fontSize: 15),
+          ),
+        ),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+          child: Text(
+            'Comma-separated. Helps readers discover your prime.',
+            style: const TextStyle(color: _textSecondary, fontSize: 12),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Shared primitives
+// ─────────────────────────────────────────────────────────────────────────────
+
+/// Borderless text field matching X's composer aesthetic.
+class _XTextField extends StatelessWidget {
+  final TextEditingController? controller;
+  final String? initialValue;
+  final String hint;
+  final TextStyle style;
+  final ValueChanged<String>? onChanged;
+
+  const _XTextField({
+    this.controller,
+    this.initialValue,
+    required this.hint,
+    required this.style,
+    this.onChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (controller != null) {
+      return TextField(
+        controller: controller,
+        style: style,
+        onChanged: onChanged,
+        decoration: InputDecoration(
+          hintText: hint,
+          hintStyle: style.copyWith(color: _textSecondary),
+          border: InputBorder.none,
+          isDense: true,
+          contentPadding: EdgeInsets.zero,
+        ),
+      );
+    }
+    return TextFormField(
+      initialValue: initialValue,
+      style: style,
+      onChanged: onChanged,
+      decoration: InputDecoration(
+        hintText: hint,
+        hintStyle: style.copyWith(color: _textSecondary),
+        border: InputBorder.none,
+        isDense: true,
+        contentPadding: EdgeInsets.zero,
+      ),
+    );
+  }
+}
+
+/// Small pill chip used for inline insert actions.
+class _InsertChip extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final VoidCallback onTap;
+  final bool disabled;
+
+  const _InsertChip({
+    required this.icon,
+    required this.label,
+    required this.onTap,
+    this.disabled = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: disabled ? null : onTap,
+      child: AnimatedOpacity(
+        opacity: disabled ? 0.35 : 1.0,
+        duration: const Duration(milliseconds: 150),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+          decoration: BoxDecoration(
+            border: Border.all(color: _border),
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(icon, size: 14, color: _textSecondary),
+              const SizedBox(width: 4),
+              Text(
+                label,
+                style: const TextStyle(
+                  color: _textSecondary,
+                  fontSize: 12,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
 }

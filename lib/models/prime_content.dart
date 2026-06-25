@@ -1,55 +1,83 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
-enum PrimeContentType { text, imageSet }
+// ─────────────────────────────────────────────
+// Block model
+// ─────────────────────────────────────────────
 
-extension PrimeContentTypeExtension on PrimeContentType {
-  String toValueString() {
-    switch (this) {
-      case PrimeContentType.text:
-        return 'text_or_link';
-      case PrimeContentType.imageSet:
-        return 'image_set';
-    }
-  }
+/// A single unit in a prime post — either a run of text or an image.
+/// Stored as an ordered list (`prime_blocks`) in the Firestore `authors` doc.
+sealed class PrimeBlock {
+  const PrimeBlock();
 
-  static PrimeContentType fromString(String? value) {
-    if (value == 'image_set') {
-      return PrimeContentType.imageSet;
+  Map<String, dynamic> toMap();
+
+  factory PrimeBlock.fromMap(Map<String, dynamic> map) {
+    final type = map['type'] as String? ?? 'text';
+    if (type == 'image') {
+      return ImageBlock(
+        url: map['url'] as String? ?? '',
+        name: map['name'] as String? ?? '',
+      );
     }
-    return PrimeContentType.text;
+    return TextBlock(text: map['text'] as String? ?? '');
   }
 }
 
-/// A single image within a prime image set, paired with its required
-/// display name (REQ-FUNC-003: "up to 4 images each with an associated name").
+class TextBlock extends PrimeBlock {
+  final String text;
+  const TextBlock({required this.text});
+
+  @override
+  Map<String, dynamic> toMap() => {'type': 'text', 'text': text};
+
+  TextBlock copyWith({String? text}) => TextBlock(text: text ?? this.text);
+}
+
+class ImageBlock extends PrimeBlock {
+  final String url;
+  final String name;
+  const ImageBlock({required this.url, this.name = ''});
+
+  @override
+  Map<String, dynamic> toMap() => {'type': 'image', 'url': url, 'name': name};
+
+  ImageBlock copyWith({String? url, String? name}) =>
+      ImageBlock(url: url ?? this.url, name: name ?? this.name);
+}
+
+// ─────────────────────────────────────────────
+// Legacy shim — kept only for fromMap migration
+// ─────────────────────────────────────────────
+
+/// Still used by StorageService path helpers and legacy fromMap reads.
 class PrimeImage {
   final String url;
   final String name;
-
   const PrimeImage({required this.url, this.name = ''});
 
-  factory PrimeImage.fromMap(Map<String, dynamic> map) {
-    return PrimeImage(
-      url: map['url'] as String? ?? '',
-      name: map['name'] as String? ?? '',
-    );
-  }
+  factory PrimeImage.fromMap(Map<String, dynamic> map) => PrimeImage(
+    url: map['url'] as String? ?? '',
+    name: map['name'] as String? ?? '',
+  );
 
   Map<String, dynamic> toMap() => {'url': url, 'name': name};
-
-  PrimeImage copyWith({String? url, String? name}) {
-    return PrimeImage(url: url ?? this.url, name: name ?? this.name);
-  }
+  PrimeImage copyWith({String? url, String? name}) =>
+      PrimeImage(url: url ?? this.url, name: name ?? this.name);
 }
+
+// ─────────────────────────────────────────────
+// AuthorProfile
+// ─────────────────────────────────────────────
 
 class AuthorProfile {
   final String uid;
   final String handle;
   final String displayName;
-  final PrimeContentType primeContentType;
-  final String? textPayload; // Used when primeContentType == text
-  final List<PrimeImage> images; // Used when primeContentType == imageSet (Max 4)
-  final List<String> tags; // Normalized strings
+
+  /// The unified, ordered content blocks for this author's prime post.
+  final List<PrimeBlock> primeBlocks;
+
+  final List<String> tags;
   final bool hidden;
   final DateTime? createdAt;
 
@@ -57,38 +85,60 @@ class AuthorProfile {
     required this.uid,
     required this.handle,
     required this.displayName,
-    required this.primeContentType,
-    this.textPayload,
-    this.images = const [],
+    this.primeBlocks = const [],
     this.tags = const [],
     this.hidden = false,
     this.createdAt,
   });
 
-  /// Factory constructor to map from Firestore document snapshot
+  /// Number of image blocks in this profile (cap: 4).
+  int get imageCount => primeBlocks.whereType<ImageBlock>().length;
+
+  /// Returns a string describing the content mix: 'text', 'image', or 'mixed'.
+  /// Used when updating the inverted tag index.
+  String get contentTypeString {
+    bool hasText = primeBlocks.any((b) => b is TextBlock);
+    bool hasImage = primeBlocks.any((b) => b is ImageBlock);
+    if (hasText && hasImage) return 'mixed';
+    if (hasImage) return 'image';
+    return 'text';
+  }
+
+  // ── Firestore read ──────────────────────────────────────────────────────────
+
   factory AuthorProfile.fromMap(String uid, Map<String, dynamic> map) {
-    // Backward compatible with the legacy flat `image_urls` field (no names)
-    // in case any records were written before names were introduced.
-    final List<PrimeImage> parsedImages;
-    if (map['images'] != null) {
-      parsedImages = (map['images'] as List)
-          .map((e) => PrimeImage.fromMap(Map<String, dynamic>.from(e as Map)))
+    List<PrimeBlock> blocks;
+
+    if (map['prime_blocks'] != null) {
+      // New schema
+      blocks = (map['prime_blocks'] as List)
+          .map((e) => PrimeBlock.fromMap(Map<String, dynamic>.from(e as Map)))
           .toList();
     } else {
-      parsedImages = List<String>.from(map['image_urls'] ?? [])
-          .map((url) => PrimeImage(url: url))
-          .toList();
+      // Migrate legacy schema → blocks on read (no write required)
+      blocks = [];
+      final textPayload = map['text_payload'] as String?;
+      if (textPayload != null && textPayload.isNotEmpty) {
+        blocks.add(TextBlock(text: textPayload));
+      }
+      // Legacy image_urls (pre-name)
+      if (map['images'] != null) {
+        for (final e in (map['images'] as List)) {
+          final img = PrimeImage.fromMap(Map<String, dynamic>.from(e as Map));
+          blocks.add(ImageBlock(url: img.url, name: img.name));
+        }
+      } else if (map['image_urls'] != null) {
+        for (final url in List<String>.from(map['image_urls'] ?? [])) {
+          blocks.add(ImageBlock(url: url));
+        }
+      }
     }
 
     return AuthorProfile(
       uid: uid,
       handle: map['handle'] as String? ?? '',
       displayName: map['displayName'] as String? ?? '',
-      primeContentType: PrimeContentTypeExtension.fromString(
-        map['prime_content_type'] as String?,
-      ),
-      textPayload: map['text_payload'] as String?,
-      images: parsedImages,
+      primeBlocks: blocks,
       tags: List<String>.from(map['tags'] ?? []),
       hidden: map['hidden'] as bool? ?? false,
       createdAt: map['created_at'] != null
@@ -97,14 +147,13 @@ class AuthorProfile {
     );
   }
 
-  /// Converts the profile model to flat JSON format for Firestore writes
+  // ── Firestore write ─────────────────────────────────────────────────────────
+
   Map<String, dynamic> toMap() {
     return {
       'handle': handle.toLowerCase().trim(),
       'displayName': displayName.trim(),
-      'prime_content_type': primeContentType.toValueString(),
-      'text_payload': textPayload,
-      'images': images.map((img) => img.toMap()).toList(),
+      'prime_blocks': primeBlocks.map((b) => b.toMap()).toList(),
       'tags': tags.map((t) => t.toLowerCase().trim()).toList(),
       'hidden': hidden,
       'created_at': createdAt != null

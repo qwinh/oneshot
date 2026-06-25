@@ -86,7 +86,7 @@ class PrimeCard extends StatelessWidget {
           // Core Prime Content (REQ-FUNC-003)
           Padding(
             padding: const EdgeInsets.all(16),
-            child: profile.primeContentType == PrimeContentType.text
+            child: profile.primeBlocks.every((b) => b is TextBlock)
                 ? _buildTextPayload()
                 : _buildImageSetGrid(),
           ),
@@ -97,13 +97,14 @@ class PrimeCard extends StatelessWidget {
 
   Widget _buildTextPayload() {
     return Text(
-      profile.textPayload ?? '',
+      profile.primeBlocks.whereType<TextBlock>().map((b) => b.text).join('\n'),
       style: const TextStyle(fontSize: 15, height: 1.5, color: Colors.white),
     );
   }
 
   Widget _buildImageSetGrid() {
-    if (profile.images.isEmpty) return const SizedBox.shrink();
+    final imageBlocks = profile.primeBlocks.whereType<ImageBlock>().toList();
+    if (imageBlocks.isEmpty) return const SizedBox.shrink();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -117,7 +118,11 @@ class PrimeCard extends StatelessWidget {
           ),
         ),
         const SizedBox(height: 12),
-        ImageGrid(images: profile.images),
+        ImageGrid(
+          images: imageBlocks
+              .map((b) => PrimeImage(url: b.url, name: b.name))
+              .toList(),
+        ),
       ],
     );
   }
