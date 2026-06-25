@@ -335,14 +335,18 @@ class DiscoveryService {
     required String authorId,
     required String authorName,
     required String authorHandle,
-    required String content,
+    required List<PrimeBlock> blocks,
   }) async {
-    await _db.collection('works').add({
-      'authorId': authorId,
-      'authorName': authorName,
-      'authorHandle': authorHandle,
-      'content': content,
-      'created_at': FieldValue.serverTimestamp(),
-    });
+    final now = DateTime.now();
+    final work = Work(
+      id: '', // Firestore will assign an ID
+      authorId: authorId,
+      authorName: authorName,
+      authorHandle: authorHandle,
+      blocks: blocks,
+      content: '', // let toMap compute it from blocks
+      createdAt: now,
+    );
+    await _db.collection('works').add(work.toMap());
   }
 }

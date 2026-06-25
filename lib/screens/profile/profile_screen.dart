@@ -6,6 +6,7 @@ import 'package:oneshot/models/work.dart';
 import 'package:oneshot/services/discovery_service.dart';
 import 'package:oneshot/services/relation_service.dart';
 import 'package:oneshot/theme/app_theme.dart';
+import 'package:oneshot/widgets/post_card.dart'; // ✅ added
 import '../discovery/prime_card.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -220,20 +221,8 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     )
                   else
-                    ..._works.map(
-                      (work) => Card(
-                        color: kSurface,
-                        margin: const EdgeInsets.only(bottom: 10),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          side: const BorderSide(color: kBorder),
-                        ),
-                        child: Padding(
-                          padding: const EdgeInsets.all(14),
-                          child: Text(work.content, style: kBodyText),
-                        ),
-                      ),
-                    ),
+                    // ✅ Use PostCard for each work
+                    ..._works.map((work) => PostCard(work: work)).toList(),
                 ],
               ),
             ),
