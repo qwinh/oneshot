@@ -12,10 +12,16 @@ import 'package:oneshot/screens/feeds/viewed_authors_screen.dart';
 import 'package:oneshot/screens/feeds/liked_authors_screen.dart';
 import 'package:oneshot/theme/app_theme.dart';
 import 'firebase_options.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+
+  await FirebaseAppCheck.instance.activate(
+    androidProvider: AndroidProvider.debug,
+  );
+
   runApp(const OneShotApp());
 }
 

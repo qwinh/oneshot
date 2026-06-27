@@ -42,6 +42,7 @@ dependencies:
   fake_cloud_firestore: ^4.1.1
   http: ^1.2.0
   image_picker: ^1.2.2
+  firebase_app_check: ^0.4.5
 
 dev_dependencies:
   flutter_test:
