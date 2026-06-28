@@ -16,12 +16,13 @@ import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:firebase_app_check/firebase_app_check.dart';
 
 void main() async {
-  await dotenv.load(fileName: '.env');
   WidgetsFlutterBinding.ensureInitialized();
+  await dotenv.load(fileName: '.env');
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   await FirebaseAppCheck.instance.activate(
     androidProvider: AndroidProvider.debug,
+    webProvider: ReCaptchaV3Provider('your-recaptcha-v3-site-key'),
   );
 
   runApp(const OneShotApp());
