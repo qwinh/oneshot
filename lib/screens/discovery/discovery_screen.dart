@@ -125,6 +125,10 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
   @override
   Widget build(BuildContext context) {
     final dp = context.watch<DiscoveryProvider>();
+    final profile = dp.currentProfile;
+    final relation = profile != null
+        ? context.watch<RelationProvider>().getRelation(profile.uid)
+        : null;
 
     return Scaffold(
       backgroundColor: kBg,
@@ -132,78 +136,65 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         title: const Text('OneShot Discovery'),
         backgroundColor: kBg,
         elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            onPressed: dp.isLoading ? null : _reload,
-          ),
-        ],
       ),
-      body: dp.isLoading
-          ? const Center(child: CircularProgressIndicator(color: kAccent))
-          : Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Text(
-                    'Browse Creators by Tag',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 13,
-                      color: kTextSecondary,
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  _TagRow(
-                    tags: dp.tags,
-                    selectedTag: dp.selectedTag,
-                    onSelect: _selectTag,
-                  ),
-                  const SizedBox(height: 24),
-                  Expanded(child: _buildBody(dp)),
-                ],
+      body: RefreshIndicator(
+        onRefresh: _reload,
+        color: kAccent,
+        backgroundColor: kSurface,
+        child: ListView(
+          padding: const EdgeInsets.all(16.0),
+          children: [
+            // Tag header
+            const Text(
+              'Browse Creators by Tag',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 13,
+                color: kTextSecondary,
               ),
             ),
-    );
-  }
-
-  Widget _buildBody(DiscoveryProvider dp) {
-    if (!dp.hasLoadedOnce) {
-      return _buildWelcomeState();
-    }
-
-    final profile = dp.currentProfile;
-    if (profile == null) {
-      return Center(
-        child: Text(
-          dp.statusMessage ?? 'All discovery opportunities complete.',
-          textAlign: TextAlign.center,
-          style: kSubtitleText.copyWith(fontSize: 15),
-        ),
-      );
-    }
-
-    final relation = context.watch<RelationProvider>().getRelation(profile.uid);
-
-    return Column(
-      children: [
-        Expanded(
-          child: SingleChildScrollView(
-            child: PrimeCard(
-              profile: profile,
-              onTapAuthor: (_) => _openProfile(),
+            const SizedBox(height: 8),
+            _TagRow(
+              tags: dp.tags,
+              selectedTag: dp.selectedTag,
+              onSelect: _selectTag,
             ),
-          ),
+            const SizedBox(height: 24),
+
+            // Content area
+            if (dp.isLoading)
+              const Center(child: CircularProgressIndicator(color: kAccent))
+            else if (!dp.hasLoadedOnce)
+              _buildWelcomeState()
+            else if (profile == null)
+              Center(
+                child: Text(
+                  dp.statusMessage ?? 'All discovery opportunities complete.',
+                  textAlign: TextAlign.center,
+                  style: kSubtitleText.copyWith(fontSize: 15),
+                ),
+              )
+            else
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: [
+                  PrimeCard(
+                    profile: profile,
+                    onTapAuthor: (_) => _openProfile(),
+                  ),
+                  const SizedBox(height: 16),
+                  ActionButtons(
+                    isLiked: relation?.liked ?? false,
+                    onNext: () => _handleAction(ActionType.next),
+                    onSubscribe: () => _handleAction(ActionType.subscribe),
+                    onReadLater: () => _handleAction(ActionType.readLater),
+                    onLikeToggled: _toggleLike,
+                  ),
+                ],
+              ),
+          ],
         ),
-        ActionButtons(
-          isLiked: relation?.liked ?? false,
-          onNext: () => _handleAction(ActionType.next),
-          onSubscribe: () => _handleAction(ActionType.subscribe),
-          onReadLater: () => _handleAction(ActionType.readLater),
-          onLikeToggled: _toggleLike,
-        ),
-      ],
+      ),
     );
   }
 

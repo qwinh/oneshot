@@ -350,66 +350,87 @@ class _AuthenticatedShellState extends State<AuthenticatedShell> {
     return Scaffold(
       appBar: AppBar(
         title: Text(_tabLabels[_tabIndex]),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout),
-            tooltip: 'Sign out',
-            onPressed: () => context.read<AppAuthProvider>().logout(),
-          ),
-        ],
+        // Removed logout button
       ),
       drawer: Drawer(
         backgroundColor: Colors.grey[950],
         child: SafeArea(
-          child: ListView(
-            padding: EdgeInsets.zero,
+          child: Column(
             children: [
-              const DrawerHeader(
-                child: Text(
-                  'ONESHOT',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                    letterSpacing: 2,
-                  ),
+              Expanded(
+                child: ListView(
+                  padding: EdgeInsets.zero,
+                  children: [
+                    const DrawerHeader(
+                      child: Text(
+                        'ONESHOT',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                          letterSpacing: 2,
+                        ),
+                      ),
+                    ),
+                    for (int i = 0; i < _tabLabels.length; i++)
+                      ListTile(
+                        leading: Icon(_tabIcons[i], color: Colors.white70),
+                        title: Text(_tabLabels[i]),
+                        selected: _tabIndex == i,
+                        onTap: () {
+                          setState(() => _tabIndex = i);
+                          Navigator.of(context).pop();
+                        },
+                      ),
+                    const Divider(color: Colors.white10),
+                    // Profile item – only if user is logged in
+                    if (userId != null)
+                      ListTile(
+                        leading: const Icon(
+                          Icons.person,
+                          color: Colors.white70,
+                        ),
+                        title: const Text('Profile'),
+                        onTap: () {
+                          Navigator.of(context).pop();
+                          Navigator.of(context).push(
+                            MaterialPageRoute(
+                              builder: (_) => ProfileScreen(authorId: userId),
+                            ),
+                          );
+                        },
+                      ),
+                    ListTile(
+                      leading: const Icon(
+                        Icons.edit_note,
+                        color: Colors.white70,
+                      ),
+                      title: const Text('Configure Discovery Prime'),
+                      onTap: () {
+                        Navigator.of(context).pop();
+                        Navigator.of(context).push(
+                          MaterialPageRoute(
+                            builder: (_) => const EditPrimeScreen(),
+                          ),
+                        );
+                      },
+                    ),
+                  ],
                 ),
               ),
-              for (int i = 0; i < _tabLabels.length; i++)
-                ListTile(
-                  leading: Icon(_tabIcons[i], color: Colors.white70),
-                  title: Text(_tabLabels[i]),
-                  selected: _tabIndex == i,
-                  onTap: () {
-                    setState(() => _tabIndex = i);
-                    Navigator.of(context).pop();
-                  },
-                ),
-              const Divider(color: Colors.white10),
-              // Profile item – only if user is logged in (should always be)
-              if (userId != null)
-                ListTile(
-                  leading: const Icon(Icons.person, color: Colors.white70),
-                  title: const Text('Profile'),
-                  onTap: () {
-                    Navigator.of(context).pop();
-                    Navigator.of(context).push(
-                      MaterialPageRoute(
-                        builder: (_) => ProfileScreen(authorId: userId),
-                      ),
-                    );
-                  },
-                ),
+              // Logout button at bottom of drawer
               ListTile(
-                leading: const Icon(Icons.edit_note, color: Colors.white70),
-                title: const Text('Configure Discovery Prime'),
+                leading: const Icon(Icons.logout, color: Colors.white70),
+                title: const Text(
+                  'Sign Out',
+                  style: TextStyle(color: Colors.white70),
+                ),
                 onTap: () {
-                  Navigator.of(context).pop();
-                  Navigator.of(context).push(
-                    MaterialPageRoute(builder: (_) => const EditPrimeScreen()),
-                  );
+                  Navigator.of(context).pop(); // close drawer
+                  context.read<AppAuthProvider>().logout();
                 },
               ),
+              const SizedBox(height: 16),
             ],
           ),
         ),

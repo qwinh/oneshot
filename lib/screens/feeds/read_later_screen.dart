@@ -152,13 +152,7 @@ class _ReadLaterScreenState extends State<ReadLaterScreen> {
         title: const Text('Read Later Shelf'),
         backgroundColor: kBg,
         elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Refresh Shelf',
-            onPressed: _refresh,
-          ),
-        ],
+        // Removed refresh action
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator(color: kAccent))

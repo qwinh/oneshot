@@ -39,6 +39,12 @@ class _SubscribeFeedScreenState extends State<SubscribeFeedScreen> {
     );
   }
 
+  void _composePost() {
+    Navigator.of(context)
+        .push(MaterialPageRoute(builder: (_) => const ComposePostScreen()))
+        .then((_) => _refresh());
+  }
+
   @override
   Widget build(BuildContext context) {
     final feedProvider = context.watch<FeedProvider>();
@@ -52,22 +58,7 @@ class _SubscribeFeedScreenState extends State<SubscribeFeedScreen> {
         title: const Text('Subscribe Feed'),
         backgroundColor: kBg,
         elevation: 0,
-        actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _refresh),
-          IconButton(
-            icon: const Icon(Icons.edit),
-            tooltip: 'New Post',
-            onPressed: () {
-              Navigator.of(context)
-                  .push(
-                    MaterialPageRoute(
-                      builder: (_) => const ComposePostScreen(),
-                    ),
-                  )
-                  .then((_) => _refresh());
-            },
-          ),
-        ],
+        // Removed refresh and edit actions
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator(color: kAccent))
@@ -93,6 +84,11 @@ class _SubscribeFeedScreenState extends State<SubscribeFeedScreen> {
                 },
               ),
             ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: _composePost,
+        backgroundColor: kAccent,
+        child: const Icon(Icons.edit, color: kBg),
+      ),
     );
   }
 

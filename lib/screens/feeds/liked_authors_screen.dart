@@ -44,13 +44,7 @@ class _LikedAuthorsScreenState extends State<LikedAuthorsScreen> {
         title: const Text('Liked Authors'),
         backgroundColor: kBg,
         elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.refresh),
-            tooltip: 'Refresh Feed',
-            onPressed: _refresh,
-          ),
-        ],
+        // Removed refresh action
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator(color: kAccent))
