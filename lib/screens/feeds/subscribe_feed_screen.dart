@@ -4,7 +4,8 @@ import 'package:oneshot/models/work.dart';
 import 'package:oneshot/services/discovery_service.dart';
 import 'package:oneshot/theme/app_theme.dart';
 import 'package:oneshot/widgets/post_card.dart';
-import 'compose_post_screen.dart';
+import '../composer/compose_post_screen.dart';
+import '../profile/profile_screen.dart'; // for navigation
 
 class SubscribeFeedScreen extends StatefulWidget {
   const SubscribeFeedScreen({super.key});
@@ -42,6 +43,12 @@ class _SubscribeFeedScreenState extends State<SubscribeFeedScreen> {
     }
   }
 
+  void _openAuthorProfile(String authorId) {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => ProfileScreen(authorId: authorId)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -76,7 +83,10 @@ class _SubscribeFeedScreenState extends State<SubscribeFeedScreen> {
               itemCount: _works.length,
               itemBuilder: (context, index) {
                 final work = _works[index];
-                return PostCard(work: work);
+                return PostCard(
+                  work: work,
+                  onTapAuthor: _openAuthorProfile, // <-- enables tap
+                );
               },
             ),
     );

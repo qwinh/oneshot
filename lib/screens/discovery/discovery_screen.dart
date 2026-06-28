@@ -6,7 +6,7 @@ import 'package:oneshot/services/discovery_service.dart';
 import 'package:oneshot/services/relation_service.dart';
 import 'package:oneshot/theme/app_theme.dart';
 import 'package:oneshot/widgets/action_buttons.dart';
-import 'prime_card.dart';
+import '../../widgets/prime_card.dart';
 import '../profile/profile_screen.dart';
 
 class DiscoveryScreen extends StatefulWidget {
@@ -290,6 +290,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                                 child: SingleChildScrollView(
                                   child: PrimeCard(
                                     profile: _candidates[_currentIndex],
+                                    onTapAuthor: (_) => _triggerProfileView(),
                                   ),
                                 ),
                               ),
@@ -301,7 +302,6 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                                 onReadLater: () =>
                                     _handleAction(ActionType.readLater),
                                 onLikeToggled: _toggleLike,
-                                onViewProfile: _triggerProfileView,
                               ),
                             ],
                           )

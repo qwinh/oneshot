@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:oneshot/models/prime_content.dart';
 import 'package:oneshot/theme/app_theme.dart';
+import 'package:oneshot/widgets/image_viewer.dart';
 
 class PrimeCard extends StatelessWidget {
   final AuthorProfile profile;
+  final void Function(String authorId)?
+  onTapAuthor; // <-- new optional callback
 
-  const PrimeCard({super.key, required this.profile});
+  const PrimeCard({super.key, required this.profile, this.onTapAuthor});
 
   @override
   Widget build(BuildContext context) {
@@ -21,7 +24,7 @@ class PrimeCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Author header
+            // Author header – now with tappable name
             Row(
               children: [
                 CircleAvatar(
@@ -41,14 +44,7 @@ class PrimeCard extends StatelessWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(
-                        profile.displayName,
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 15,
-                          color: kTextPrimary,
-                        ),
-                      ),
+                      _buildAuthorName(),
                       const SizedBox(height: 2),
                       Text('@${profile.handle}', style: kSubtitleText),
                     ],
@@ -77,7 +73,7 @@ class PrimeCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
-            // Blocks rendered sequentially, same as PostCard
+            // Blocks
             ...profile.primeBlocks.map((block) => _buildBlock(context, block)),
             // Tags
             if (profile.tags.isNotEmpty) ...[
@@ -104,6 +100,25 @@ class PrimeCard extends StatelessWidget {
     );
   }
 
+  Widget _buildAuthorName() {
+    final child = Text(
+      profile.displayName,
+      style: TextStyle(
+        fontWeight: FontWeight.bold,
+        fontSize: 15,
+        color: kTextPrimary,
+        decoration: onTapAuthor != null ? TextDecoration.underline : null,
+      ),
+    );
+    if (onTapAuthor != null) {
+      return GestureDetector(
+        onTap: () => onTapAuthor!(profile.uid),
+        child: child,
+      );
+    }
+    return child;
+  }
+
   Widget _buildBlock(BuildContext context, PrimeBlock block) {
     if (block is TextBlock) {
       return Padding(
@@ -119,7 +134,7 @@ class PrimeCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(8),
             child: Image.network(
               block.url,
-              fit: BoxFit.contain, // No crop
+              fit: BoxFit.contain,
               width: double.infinity,
               height: 200,
               errorBuilder: (_, __, ___) => Container(
@@ -139,43 +154,6 @@ class PrimeCard extends StatelessWidget {
   }
 
   void _showFullScreenImage(BuildContext context, String imageUrl) {
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: EdgeInsets.zero,
-        child: Stack(
-          children: [
-            InteractiveViewer(
-              panEnabled: true,
-              boundaryMargin: const EdgeInsets.all(20),
-              minScale: 0.5,
-              maxScale: 4.0,
-              child: Center(
-                child: Image.network(
-                  imageUrl,
-                  fit: BoxFit.contain,
-                  width: double.infinity,
-                  height: double.infinity,
-                  errorBuilder: (_, __, ___) => const Icon(
-                    Icons.broken_image_outlined,
-                    color: Colors.white70,
-                    size: 80,
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              top: 40,
-              right: 20,
-              child: IconButton(
-                icon: const Icon(Icons.close, color: Colors.white, size: 30),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    FullScreenImageViewer.show(context, imageUrl);
   }
 }

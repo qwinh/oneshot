@@ -2,11 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:oneshot/models/prime_content.dart';
 import 'package:oneshot/models/work.dart';
 import 'package:oneshot/theme/app_theme.dart';
+import 'package:oneshot/widgets/image_viewer.dart';
 
 class PostCard extends StatelessWidget {
   final Work work;
+  final void Function(String authorId)? onTapAuthor; // optional
 
-  const PostCard({super.key, required this.work});
+  const PostCard({super.key, required this.work, this.onTapAuthor});
 
   @override
   Widget build(BuildContext context) {
@@ -25,14 +27,7 @@ class PostCard extends StatelessWidget {
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Text(
-                  work.authorName,
-                  style: const TextStyle(
-                    fontWeight: FontWeight.bold,
-                    fontSize: 15,
-                    color: kTextPrimary,
-                  ),
-                ),
+                _buildAuthorName(),
                 Text(
                   '${work.createdAt.hour}:${work.createdAt.minute.toString().padLeft(2, '0')}',
                   style: kSubtitleText.copyWith(fontSize: 12),
@@ -42,12 +37,30 @@ class PostCard extends StatelessWidget {
             const SizedBox(height: 2),
             Text('@${work.authorHandle}', style: kSubtitleText),
             const SizedBox(height: 12),
-            // Render blocks
             ...work.blocks.map((block) => _buildBlock(context, block)).toList(),
           ],
         ),
       ),
     );
+  }
+
+  Widget _buildAuthorName() {
+    final child = Text(
+      work.authorName,
+      style: TextStyle(
+        fontWeight: FontWeight.bold,
+        fontSize: 15,
+        color: kTextPrimary,
+        decoration: onTapAuthor != null ? TextDecoration.underline : null,
+      ),
+    );
+    if (onTapAuthor != null) {
+      return GestureDetector(
+        onTap: () => onTapAuthor!(work.authorId),
+        child: child,
+      );
+    }
+    return child;
   }
 
   Widget _buildBlock(BuildContext context, PrimeBlock block) {
@@ -65,7 +78,7 @@ class PostCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(8),
             child: Image.network(
               block.url,
-              fit: BoxFit.contain, // No crop
+              fit: BoxFit.contain,
               width: double.infinity,
               height: 200,
               errorBuilder: (_, __, ___) => Container(
@@ -85,43 +98,6 @@ class PostCard extends StatelessWidget {
   }
 
   void _showFullScreenImage(BuildContext context, String imageUrl) {
-    showDialog(
-      context: context,
-      builder: (context) => Dialog(
-        backgroundColor: Colors.transparent,
-        insetPadding: EdgeInsets.zero,
-        child: Stack(
-          children: [
-            InteractiveViewer(
-              panEnabled: true,
-              boundaryMargin: const EdgeInsets.all(20),
-              minScale: 0.5,
-              maxScale: 4.0,
-              child: Center(
-                child: Image.network(
-                  imageUrl,
-                  fit: BoxFit.contain,
-                  width: double.infinity,
-                  height: double.infinity,
-                  errorBuilder: (_, __, ___) => const Icon(
-                    Icons.broken_image_outlined,
-                    color: Colors.white70,
-                    size: 80,
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              top: 40,
-              right: 20,
-              child: IconButton(
-                icon: const Icon(Icons.close, color: Colors.white, size: 30),
-                onPressed: () => Navigator.of(context).pop(),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
+    FullScreenImageViewer.show(context, imageUrl);
   }
 }

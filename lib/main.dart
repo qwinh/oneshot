@@ -3,7 +3,7 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:oneshot/services/auth_service.dart';
 import 'package:oneshot/screens/auth/login_screen.dart';
-import 'package:oneshot/screens/profile/edit_prime_screen.dart';
+import 'package:oneshot/screens/composer/edit_prime_screen.dart';
 import 'package:oneshot/screens/discovery/discovery_screen.dart';
 import 'package:oneshot/screens/search/search_screen.dart';
 import 'package:oneshot/screens/feeds/subscribe_feed_screen.dart';
