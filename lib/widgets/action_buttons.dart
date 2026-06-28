@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 
+typedef VoidRefCallback = void Function();
+
 class ActionButtons extends StatelessWidget {
   final bool isLiked;
   final VoidRefCallback onNext;
   final VoidRefCallback onSubscribe;
   final VoidRefCallback onReadLater;
   final ValueChanged<bool> onLikeToggled;
-  final VoidRefCallback onViewProfile;
 
   const ActionButtons({
     super.key,
@@ -15,7 +16,6 @@ class ActionButtons extends StatelessWidget {
     required this.onSubscribe,
     required this.onReadLater,
     required this.onLikeToggled,
-    required this.onViewProfile,
   });
 
   @override
@@ -26,97 +26,64 @@ class ActionButtons extends StatelessWidget {
         color: Colors.grey[900],
         borderRadius: const BorderRadius.vertical(bottom: Radius.circular(16)),
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
         children: [
-          // Primary Consuming Actions Row
-          Row(
-            children: [
-              // Next Action
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: onNext,
-                  icon: const Icon(Icons.skip_next, color: Colors.white70),
-                  label: const Text('Next'),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: Colors.grey[700]!),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
+          // Next button (compact)
+          OutlinedButton.icon(
+            onPressed: onNext,
+            icon: const Icon(Icons.skip_next, color: Colors.white70, size: 20),
+            label: const Text('Next', style: TextStyle(fontSize: 13)),
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(color: Colors.grey[700]!),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
-              const SizedBox(width: 8),
-              // Read Later Action
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: onReadLater,
-                  icon: const Icon(
-                    Icons.bookmark_outline,
-                    color: Colors.orangeAccent,
-                  ),
-                  label: const Text('Read Later'),
-                  style: OutlinedButton.styleFrom(
-                    side: BorderSide(color: Colors.grey[700]!),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              // Subscribe Conversion Action
-              Expanded(
-                child: ElevatedButton.icon(
-                  onPressed: onSubscribe,
-                  icon: const Icon(Icons.bolt, color: Colors.black),
-                  label: const Text('Subscribe'),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: Colors.black,
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                  ),
-                ),
-              ),
-            ],
+            ),
           ),
-          const Divider(height: 24, color: Colors.white10),
-          // Ancillary Actions Row (Does NOT consume discovery status)
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              // View Profile Trigger
-              TextButton.icon(
-                onPressed: onViewProfile,
-                icon: const Icon(
-                  Icons.person_search_outlined,
-                  color: Colors.white70,
-                ),
-                label: const Text(
-                  'View Profile',
-                  style: TextStyle(color: Colors.white70),
-                ),
+          // Read Later button
+          OutlinedButton.icon(
+            onPressed: onReadLater,
+            icon: const Icon(
+              Icons.bookmark_outline,
+              color: Colors.orangeAccent,
+              size: 20,
+            ),
+            label: const Text('Read Later', style: TextStyle(fontSize: 13)),
+            style: OutlinedButton.styleFrom(
+              side: BorderSide(color: Colors.grey[700]!),
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
-              // Like Interactive Switch
-              IconButton(
-                onPressed: () => onLikeToggled(!isLiked),
-                icon: Icon(
-                  isLiked ? Icons.favorite : Icons.favorite_border,
-                  color: isLiked ? Colors.redAccent : Colors.white60,
-                  size: 28,
-                ),
+            ),
+          ),
+          // Subscribe button (primary)
+          ElevatedButton.icon(
+            onPressed: onSubscribe,
+            icon: const Icon(Icons.bolt, color: Colors.black, size: 20),
+            label: const Text('Subscribe', style: TextStyle(fontSize: 13)),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.white,
+              foregroundColor: Colors.black,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
               ),
-            ],
+            ),
+          ),
+          // Like toggle (icon only)
+          IconButton(
+            onPressed: () => onLikeToggled(!isLiked),
+            icon: Icon(
+              isLiked ? Icons.favorite : Icons.favorite_border,
+              color: isLiked ? Colors.redAccent : Colors.white60,
+              size: 28,
+            ),
           ),
         ],
       ),
     );
   }
 }
-
-typedef VoidRefCallback = void Function();

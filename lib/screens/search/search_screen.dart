@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:oneshot/models/prime_content.dart';
+import 'package:oneshot/services/auth_service.dart';
 import 'package:oneshot/services/discovery_service.dart';
 import 'package:oneshot/theme/app_theme.dart';
 import '../profile/profile_screen.dart';
@@ -13,19 +14,80 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen> {
   final DiscoveryService _discoveryService = DiscoveryService();
+  final AuthService _authService = AuthService();
   final TextEditingController _searchController = TextEditingController();
 
   List<AuthorProfile> _results = [];
   bool _isLoading = false;
+  bool _subscribedOnly = false;
+  Set<String> _subscribedIds = {};
 
-  Future<void> _executeSearch() async {
-    final query = _searchController.text.trim();
-    if (query.isEmpty) return;
+  @override
+  void initState() {
+    super.initState();
+    // If toggle is on by default (optional), we could load subscriptions initially.
+  }
+
+  // Fetch the set of subscribed author IDs (used for filtering search results)
+  Future<void> _refreshSubscriptions() async {
+    final user = _authService.currentUser;
+    if (user == null) return;
+    _subscribedIds = await _discoveryService.getSubscribedAuthorIds(user.uid);
+  }
+
+  // Load all subscribed authors (used when toggle ON + no search query)
+  Future<void> _loadAllSubscribed() async {
+    final user = _authService.currentUser;
+    if (user == null) return;
 
     setState(() => _isLoading = true);
     try {
+      final profiles = await _discoveryService.getSubscribedAuthors(user.uid);
+      setState(() {
+        _results = profiles;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to load subscriptions: $e')),
+      );
+    }
+  }
+
+  // Main search execution – decides between search query and all-subscriptions
+  Future<void> _executeSearch() async {
+    final query = _searchController.text.trim();
+
+    // Case: toggle ON and no search query → show all subscribed
+    if (_subscribedOnly && query.isEmpty) {
+      await _loadAllSubscribed();
+      return;
+    }
+
+    // Case: no search query and toggle OFF (or toggle ON but query empty already handled)
+    if (query.isEmpty) {
+      setState(() => _results = []);
+      return;
+    }
+
+    // Normal search path (query not empty)
+    setState(() => _isLoading = true);
+
+    try {
+      // If filter is enabled, ensure subscriptions are loaded
+      if (_subscribedOnly) {
+        await _refreshSubscriptions();
+      }
+
       final list = await _discoveryService.searchAuthors(query);
-      setState(() => _results = list);
+
+      List<AuthorProfile> filtered = list;
+      if (_subscribedOnly) {
+        filtered = list.where((p) => _subscribedIds.contains(p.uid)).toList();
+      }
+
+      setState(() => _results = filtered);
     } catch (e) {
       ScaffoldMessenger.of(
         context,
@@ -54,6 +116,7 @@ class _SearchScreenState extends State<SearchScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
+            // Search bar row
             Row(
               children: [
                 Expanded(
@@ -92,7 +155,30 @@ class _SearchScreenState extends State<SearchScreen> {
                 ),
               ],
             ),
-            const SizedBox(height: 24),
+            const SizedBox(height: 12),
+            // Toggle: Subscribed only
+            Row(
+              children: [
+                const Text(
+                  'Show only subscribed',
+                  style: TextStyle(color: kTextSecondary),
+                ),
+                const Spacer(),
+                Switch(
+                  value: _subscribedOnly,
+                  onChanged: (value) async {
+                    setState(() {
+                      _subscribedOnly = value;
+                    });
+                    // Trigger a refresh based on current search text
+                    await _executeSearch();
+                  },
+                  activeColor: kAccent,
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            // Results area
             Expanded(
               child: _isLoading
                   ? const Center(
@@ -141,25 +227,28 @@ class _SearchScreenState extends State<SearchScreen> {
   }
 
   Widget _buildEmptyState() {
-    return const Center(
+    String message = 'No Results Found';
+    String hint = 'Enter an exact handle or displayName prefix to query.';
+    if (_subscribedOnly) {
+      message = 'No subscribed authors found';
+      hint = 'Toggle off to search all authors.';
+    }
+    return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
           Icon(Icons.search_off, size: 60, color: Colors.white24),
-          SizedBox(height: 16),
+          const SizedBox(height: 16),
           Text(
-            'No Results Found',
-            style: TextStyle(
+            message,
+            style: const TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.bold,
               color: kTextPrimary,
             ),
           ),
-          SizedBox(height: 8),
-          Text(
-            'Enter an exact handle or displayName prefix to query.',
-            style: TextStyle(color: kTextSecondary),
-          ),
+          const SizedBox(height: 8),
+          Text(hint, style: const TextStyle(color: kTextSecondary)),
         ],
       ),
     );

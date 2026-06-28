@@ -4,7 +4,7 @@ import 'package:oneshot/models/prime_content.dart';
 import 'package:oneshot/services/discovery_service.dart';
 import 'package:oneshot/services/relation_service.dart';
 import 'package:oneshot/theme/app_theme.dart';
-import '../discovery/prime_card.dart';
+import '../../widgets/prime_card.dart';
 import '../profile/profile_screen.dart';
 
 class ReadLaterScreen extends StatefulWidget {

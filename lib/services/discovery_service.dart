@@ -330,6 +330,48 @@ class DiscoveryService {
     return works;
   }
 
+  /// Returns a set of author IDs that the viewer has subscribed to.
+  Future<Set<String>> getSubscribedAuthorIds(String viewerId) async {
+    final snap = await _db
+        .collection('relations')
+        .where('viewerId', isEqualTo: viewerId)
+        .where('subscribed', isEqualTo: true)
+        .get();
+    return snap.docs.map((doc) => doc.data()['authorId'] as String).toSet();
+  }
+
+  /// Returns full AuthorProfile objects for all authors the viewer is subscribed to.
+  Future<List<AuthorProfile>> getSubscribedAuthors(String viewerId) async {
+    final relationsSnap = await _db
+        .collection('relations')
+        .where('viewerId', isEqualTo: viewerId)
+        .where('subscribed', isEqualTo: true)
+        .get();
+
+    if (relationsSnap.docs.isEmpty) return [];
+
+    final List<String> authorIds = relationsSnap.docs
+        .map((doc) => doc.data()['authorId'] as String)
+        .toList();
+
+    // Fetch profiles in chunks of 30 for Firestore `whereIn`
+    List<AuthorProfile> profiles = [];
+    for (var i = 0; i < authorIds.length; i += 30) {
+      final chunk = authorIds.sublist(
+        i,
+        (i + 30 > authorIds.length) ? authorIds.length : i + 30,
+      );
+      final snap = await _db
+          .collection('authors')
+          .where(FieldPath.documentId, whereIn: chunk)
+          .get();
+      for (final doc in snap.docs) {
+        profiles.add(AuthorProfile.fromMap(doc.id, doc.data()));
+      }
+    }
+    return profiles;
+  }
+
   /// Publishes a regular content Update (Work) to the system.
   Future<void> publishWork({
     required String authorId,

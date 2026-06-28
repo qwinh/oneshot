@@ -7,7 +7,7 @@ import 'package:oneshot/services/discovery_service.dart';
 import 'package:oneshot/services/relation_service.dart';
 import 'package:oneshot/theme/app_theme.dart';
 import 'package:oneshot/widgets/post_card.dart'; // ✅ added
-import '../discovery/prime_card.dart';
+import '../../widgets/prime_card.dart';
 
 class ProfileScreen extends StatefulWidget {
   final String authorId;
