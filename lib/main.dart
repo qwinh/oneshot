@@ -12,8 +12,10 @@ import 'package:oneshot/screens/feeds/viewed_authors_screen.dart';
 import 'package:oneshot/screens/feeds/liked_authors_screen.dart';
 import 'package:oneshot/theme/app_theme.dart';
 import 'firebase_options.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 
 void main() async {
+  await dotenv.load(fileName: '.env');
   WidgetsFlutterBinding.ensureInitialized();
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
   runApp(const OneShotApp());

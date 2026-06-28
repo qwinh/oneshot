@@ -42,6 +42,9 @@ dependencies:
   fake_cloud_firestore: ^4.1.1
   http: ^1.2.0
   image_picker: ^1.2.2
+  cloudflare_r2_uploader: ^1.0.0
+  minio: ^3.5.8
+  flutter_dotenv: ^6.0.1
 
 dev_dependencies:
   flutter_test:

@@ -1,39 +1,64 @@
 // lib/services/storage_service.dart
 
 import 'dart:typed_data';
-import 'dart:convert';
-import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:minio/minio.dart';
 
 class StorageService {
-  // 🔑 Get your free API key at https://imgbb.com/
-  final String apiKey =
-      'd119856c209a4f9d7579caecb90defa1'; // <-- replace with your real key
+  // Read from environment
+  final String _accountId = dotenv.env['R2_ACCOUNT_ID'] ?? '';
+  final String _accessKeyId = dotenv.env['R2_ACCESS_KEY'] ?? '';
+  final String _secretAccessKey = dotenv.env['R2_SECRET_KEY'] ?? '';
+  final String _bucketName = dotenv.env['R2_BUCKET_NAME'] ?? '';
+  final String _publicBaseUrl = dotenv.env['R2_PUBLIC_URL'] ?? '';
+
+  // Validate that all keys exist
+  StorageService() {
+    if (_accountId.isEmpty ||
+        _accessKeyId.isEmpty ||
+        _secretAccessKey.isEmpty ||
+        _bucketName.isEmpty ||
+        _publicBaseUrl.isEmpty) {
+      throw Exception('Missing Cloudflare R2 credentials in .env file');
+    }
+  }
+
+  late final Minio _minio = Minio(
+    endPoint: '$_accountId.r2.cloudflarestorage.com',
+    accessKey: _accessKeyId,
+    secretKey: _secretAccessKey,
+    region: 'auto',
+    useSSL: true,
+  );
 
   Future<String> uploadPrimeImage({
     required String authorId,
     required String fileName,
     required Uint8List bytes,
   }) async {
-    var request = http.MultipartRequest(
-      'POST',
-      Uri.parse('https://api.imgbb.com/1/upload?key=$apiKey'),
-    );
-    request.files.add(
-      http.MultipartFile.fromBytes('image', bytes, filename: fileName),
-    );
-    final response = await request.send();
-    final responseBody = await response.stream.bytesToString();
-    final json = jsonDecode(responseBody);
-    if (json['success'] == true) {
-      return json['data']['url'];
-    } else {
-      throw Exception('ImgBB upload failed: ${json['error']['message']}');
+    try {
+      final String objectName = 'authors/$authorId/prime/$fileName';
+      await _minio.putObject(
+        _bucketName,
+        objectName,
+        Stream.fromIterable([bytes]),
+      );
+      final String publicUrl = '$_publicBaseUrl/$objectName';
+      print('✅ Uploaded to R2: $publicUrl');
+      return publicUrl;
+    } catch (e) {
+      print('❌ Upload failed: $e');
+      throw Exception('Failed to upload image: $e');
     }
   }
 
-  // ImgBB has no free deletion API, so we keep this as a no-op
   Future<void> deleteImageByUrl(String url) async {
-    // optional: you could ignore or log
-    return;
+    try {
+      final String objectName = url.replaceFirst('$_publicBaseUrl/', '');
+      await _minio.removeObject(_bucketName, objectName);
+      print('✅ Deleted: $objectName');
+    } catch (e) {
+      print('❌ Delete failed: $e');
+    }
   }
 }
