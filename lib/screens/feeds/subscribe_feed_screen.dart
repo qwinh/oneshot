@@ -58,7 +58,6 @@ class _SubscribeFeedScreenState extends State<SubscribeFeedScreen> {
         title: const Text('Subscribe Feed'),
         backgroundColor: kBg,
         elevation: 0,
-        // Removed refresh and edit actions
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator(color: kAccent))
@@ -69,20 +68,32 @@ class _SubscribeFeedScreenState extends State<SubscribeFeedScreen> {
                 style: const TextStyle(color: Colors.redAccent),
               ),
             )
-          : works.isEmpty
-          ? _buildEmptyState()
           : RefreshIndicator(
               onRefresh: _refresh,
               color: kAccent,
               backgroundColor: kSurface,
-              child: ListView.builder(
-                padding: const EdgeInsets.all(16),
-                itemCount: works.length,
-                itemBuilder: (context, index) {
-                  final work = works[index];
-                  return PostCard(work: work, onTapAuthor: _openAuthorProfile);
-                },
-              ),
+              child: works.isEmpty
+                  ? SingleChildScrollView(
+                      // Allow overscroll even when content is small
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      child: Container(
+                        height: MediaQuery.of(context).size.height - 150,
+                        alignment: Alignment.center,
+                        child: _buildEmptyState(),
+                      ),
+                    )
+                  : ListView.builder(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      padding: const EdgeInsets.all(16),
+                      itemCount: works.length,
+                      itemBuilder: (context, index) {
+                        final work = works[index];
+                        return PostCard(
+                          work: work,
+                          onTapAuthor: _openAuthorProfile,
+                        );
+                      },
+                    ),
             ),
       floatingActionButton: FloatingActionButton(
         onPressed: _composePost,
