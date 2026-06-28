@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:oneshot/models/prime_content.dart';
-import 'package:oneshot/services/discovery_service.dart';
+import 'package:provider/provider.dart';
+import 'package:oneshot/providers/auth_provider.dart';
+import 'package:oneshot/providers/feed_provider.dart';
 import 'package:oneshot/theme/app_theme.dart';
 import '../profile/profile_screen.dart';
 
@@ -13,36 +13,31 @@ class LikedAuthorsScreen extends StatefulWidget {
 }
 
 class _LikedAuthorsScreenState extends State<LikedAuthorsScreen> {
-  final DiscoveryService _discoveryService = DiscoveryService();
-
-  List<AuthorProfile> _likes = [];
-  bool _isLoading = false;
-
   @override
   void initState() {
     super.initState();
-    _fetchFeed();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
-  Future<void> _fetchFeed() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+  Future<void> _load() async {
+    final userId = context.read<AppAuthProvider>().currentUserId;
+    if (userId == null) return;
+    await context.read<FeedProvider>().loadLikedAuthorsFeed(userId);
+  }
 
-    setState(() => _isLoading = true);
-    try {
-      final list = await _discoveryService.getLikedAuthorsFeed(user.uid);
-      setState(() => _likes = list);
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error loading likes: $e')));
-    } finally {
-      setState(() => _isLoading = false);
-    }
+  Future<void> _refresh() async {
+    final userId = context.read<AppAuthProvider>().currentUserId;
+    if (userId == null) return;
+    await context.read<FeedProvider>().loadLikedAuthorsFeed(userId);
   }
 
   @override
   Widget build(BuildContext context) {
+    final feedProvider = context.watch<FeedProvider>();
+    final isLoading = feedProvider.likedAuthorsLoading;
+    final likes = feedProvider.likedAuthorsFeed;
+    final error = feedProvider.likedAuthorsError;
+
     return Scaffold(
       backgroundColor: kBg,
       appBar: AppBar(
@@ -53,17 +48,24 @@ class _LikedAuthorsScreenState extends State<LikedAuthorsScreen> {
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh Feed',
-            onPressed: _fetchFeed,
+            onPressed: _refresh,
           ),
         ],
       ),
-      body: _isLoading
+      body: isLoading
           ? const Center(child: CircularProgressIndicator(color: kAccent))
+          : error != null
+          ? Center(
+              child: Text(
+                error,
+                style: const TextStyle(color: Colors.redAccent),
+              ),
+            )
           : RefreshIndicator(
+              onRefresh: _refresh,
               color: kAccent,
               backgroundColor: kSurface,
-              onRefresh: _fetchFeed,
-              child: _likes.isEmpty
+              child: likes.isEmpty
                   ? SingleChildScrollView(
                       physics: const AlwaysScrollableScrollPhysics(),
                       child: Container(
@@ -75,9 +77,9 @@ class _LikedAuthorsScreenState extends State<LikedAuthorsScreen> {
                   : ListView.builder(
                       physics: const AlwaysScrollableScrollPhysics(),
                       padding: const EdgeInsets.all(16),
-                      itemCount: _likes.length,
+                      itemCount: likes.length,
                       itemBuilder: (context, index) {
-                        final profile = _likes[index];
+                        final profile = likes[index];
                         return Card(
                           color: kSurface,
                           margin: const EdgeInsets.only(bottom: 10),

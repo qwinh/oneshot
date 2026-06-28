@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:oneshot/models/work.dart';
-import 'package:oneshot/services/discovery_service.dart';
+import 'package:provider/provider.dart';
+import 'package:oneshot/providers/auth_provider.dart';
+import 'package:oneshot/providers/feed_provider.dart';
 import 'package:oneshot/theme/app_theme.dart';
 import 'package:oneshot/widgets/post_card.dart';
 import '../composer/compose_post_screen.dart';
-import '../profile/profile_screen.dart'; // for navigation
+import '../profile/profile_screen.dart';
 
 class SubscribeFeedScreen extends StatefulWidget {
   const SubscribeFeedScreen({super.key});
@@ -15,32 +15,22 @@ class SubscribeFeedScreen extends StatefulWidget {
 }
 
 class _SubscribeFeedScreenState extends State<SubscribeFeedScreen> {
-  final DiscoveryService _discoveryService = DiscoveryService();
-
-  List<Work> _works = [];
-  bool _isLoading = false;
-
   @override
   void initState() {
     super.initState();
-    _fetchFeed();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
-  Future<void> _fetchFeed() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+  Future<void> _load() async {
+    final userId = context.read<AppAuthProvider>().currentUserId;
+    if (userId == null) return;
+    await context.read<FeedProvider>().loadSubscribeFeed(userId);
+  }
 
-    setState(() => _isLoading = true);
-    try {
-      final list = await _discoveryService.getSubscribeFeed(user.uid);
-      setState(() => _works = list);
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error loading feed: $e')));
-    } finally {
-      setState(() => _isLoading = false);
-    }
+  Future<void> _refresh() async {
+    final userId = context.read<AppAuthProvider>().currentUserId;
+    if (userId == null) return;
+    await context.read<FeedProvider>().loadSubscribeFeed(userId);
   }
 
   void _openAuthorProfile(String authorId) {
@@ -51,6 +41,11 @@ class _SubscribeFeedScreenState extends State<SubscribeFeedScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final feedProvider = context.watch<FeedProvider>();
+    final isLoading = feedProvider.subscribeFeedLoading;
+    final works = feedProvider.subscribeFeed;
+    final error = feedProvider.subscribeFeedError;
+
     return Scaffold(
       backgroundColor: kBg,
       appBar: AppBar(
@@ -58,7 +53,7 @@ class _SubscribeFeedScreenState extends State<SubscribeFeedScreen> {
         backgroundColor: kBg,
         elevation: 0,
         actions: [
-          IconButton(icon: const Icon(Icons.refresh), onPressed: _fetchFeed),
+          IconButton(icon: const Icon(Icons.refresh), onPressed: _refresh),
           IconButton(
             icon: const Icon(Icons.edit),
             tooltip: 'New Post',
@@ -69,25 +64,34 @@ class _SubscribeFeedScreenState extends State<SubscribeFeedScreen> {
                       builder: (_) => const ComposePostScreen(),
                     ),
                   )
-                  .then((_) => _fetchFeed());
+                  .then((_) => _refresh());
             },
           ),
         ],
       ),
-      body: _isLoading
+      body: isLoading
           ? const Center(child: CircularProgressIndicator(color: kAccent))
-          : _works.isEmpty
+          : error != null
+          ? Center(
+              child: Text(
+                error,
+                style: const TextStyle(color: Colors.redAccent),
+              ),
+            )
+          : works.isEmpty
           ? _buildEmptyState()
-          : ListView.builder(
-              padding: const EdgeInsets.all(16),
-              itemCount: _works.length,
-              itemBuilder: (context, index) {
-                final work = _works[index];
-                return PostCard(
-                  work: work,
-                  onTapAuthor: _openAuthorProfile, // <-- enables tap
-                );
-              },
+          : RefreshIndicator(
+              onRefresh: _refresh,
+              color: kAccent,
+              backgroundColor: kSurface,
+              child: ListView.builder(
+                padding: const EdgeInsets.all(16),
+                itemCount: works.length,
+                itemBuilder: (context, index) {
+                  final work = works[index];
+                  return PostCard(work: work, onTapAuthor: _openAuthorProfile);
+                },
+              ),
             ),
     );
   }

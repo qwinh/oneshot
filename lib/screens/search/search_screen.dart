@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:provider/provider.dart';
 import 'package:oneshot/models/prime_content.dart';
-import 'package:oneshot/services/auth_service.dart';
+import 'package:oneshot/providers/auth_provider.dart';
 import 'package:oneshot/services/discovery_service.dart';
 import 'package:oneshot/theme/app_theme.dart';
 import '../profile/profile_screen.dart';
@@ -14,7 +15,6 @@ class SearchScreen extends StatefulWidget {
 
 class _SearchScreenState extends State<SearchScreen> {
   final DiscoveryService _discoveryService = DiscoveryService();
-  final AuthService _authService = AuthService();
   final TextEditingController _searchController = TextEditingController();
 
   List<AuthorProfile> _results = [];
@@ -25,19 +25,16 @@ class _SearchScreenState extends State<SearchScreen> {
   @override
   void initState() {
     super.initState();
-    // If toggle is on by default (optional), we could load subscriptions initially.
   }
 
-  // Fetch the set of subscribed author IDs (used for filtering search results)
   Future<void> _refreshSubscriptions() async {
-    final user = _authService.currentUser;
+    final user = context.read<AppAuthProvider>().currentUser;
     if (user == null) return;
     _subscribedIds = await _discoveryService.getSubscribedAuthorIds(user.uid);
   }
 
-  // Load all subscribed authors (used when toggle ON + no search query)
   Future<void> _loadAllSubscribed() async {
-    final user = _authService.currentUser;
+    final user = context.read<AppAuthProvider>().currentUser;
     if (user == null) return;
 
     setState(() => _isLoading = true);
@@ -55,27 +52,22 @@ class _SearchScreenState extends State<SearchScreen> {
     }
   }
 
-  // Main search execution – decides between search query and all-subscriptions
   Future<void> _executeSearch() async {
     final query = _searchController.text.trim();
 
-    // Case: toggle ON and no search query → show all subscribed
     if (_subscribedOnly && query.isEmpty) {
       await _loadAllSubscribed();
       return;
     }
 
-    // Case: no search query and toggle OFF (or toggle ON but query empty already handled)
     if (query.isEmpty) {
       setState(() => _results = []);
       return;
     }
 
-    // Normal search path (query not empty)
     setState(() => _isLoading = true);
 
     try {
-      // If filter is enabled, ensure subscriptions are loaded
       if (_subscribedOnly) {
         await _refreshSubscriptions();
       }
@@ -116,7 +108,6 @@ class _SearchScreenState extends State<SearchScreen> {
         padding: const EdgeInsets.all(16.0),
         child: Column(
           children: [
-            // Search bar row
             Row(
               children: [
                 Expanded(
@@ -156,7 +147,6 @@ class _SearchScreenState extends State<SearchScreen> {
               ],
             ),
             const SizedBox(height: 12),
-            // Toggle: Subscribed only
             Row(
               children: [
                 const Text(
@@ -170,7 +160,6 @@ class _SearchScreenState extends State<SearchScreen> {
                     setState(() {
                       _subscribedOnly = value;
                     });
-                    // Trigger a refresh based on current search text
                     await _executeSearch();
                   },
                   activeColor: kAccent,
@@ -178,7 +167,6 @@ class _SearchScreenState extends State<SearchScreen> {
               ],
             ),
             const SizedBox(height: 16),
-            // Results area
             Expanded(
               child: _isLoading
                   ? const Center(

@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
 import 'package:oneshot/models/relation.dart';
-import 'package:oneshot/services/discovery_service.dart';
+import 'package:oneshot/providers/auth_provider.dart';
+import 'package:oneshot/providers/feed_provider.dart';
 import 'package:oneshot/theme/app_theme.dart';
 import '../profile/profile_screen.dart';
 
@@ -13,32 +14,22 @@ class ViewedAuthorsScreen extends StatefulWidget {
 }
 
 class _ViewedAuthorsScreenState extends State<ViewedAuthorsScreen> {
-  final DiscoveryService _discoveryService = DiscoveryService();
-
-  List<ViewedAuthorResult> _history = [];
-  bool _isLoading = false;
-
   @override
   void initState() {
     super.initState();
-    _fetchFeed();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
-  Future<void> _fetchFeed() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+  Future<void> _load() async {
+    final userId = context.read<AppAuthProvider>().currentUserId;
+    if (userId == null) return;
+    await context.read<FeedProvider>().loadViewedAuthorsFeed(userId);
+  }
 
-    setState(() => _isLoading = true);
-    try {
-      final list = await _discoveryService.getViewedAuthorsFeed(user.uid);
-      setState(() => _history = list);
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error loading history: $e')));
-    } finally {
-      setState(() => _isLoading = false);
-    }
+  Future<void> _refresh() async {
+    final userId = context.read<AppAuthProvider>().currentUserId;
+    if (userId == null) return;
+    await context.read<FeedProvider>().loadViewedAuthorsFeed(userId);
   }
 
   String _actionLabel(ActionType action) {
@@ -74,6 +65,11 @@ class _ViewedAuthorsScreenState extends State<ViewedAuthorsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final feedProvider = context.watch<FeedProvider>();
+    final isLoading = feedProvider.viewedAuthorsLoading;
+    final history = feedProvider.viewedAuthorsFeed;
+    final error = feedProvider.viewedAuthorsError;
+
     return Scaffold(
       backgroundColor: kBg,
       appBar: AppBar(
@@ -84,17 +80,24 @@ class _ViewedAuthorsScreenState extends State<ViewedAuthorsScreen> {
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh History',
-            onPressed: _fetchFeed,
+            onPressed: _refresh,
           ),
         ],
       ),
-      body: _isLoading
+      body: isLoading
           ? const Center(child: CircularProgressIndicator(color: kAccent))
+          : error != null
+          ? Center(
+              child: Text(
+                error,
+                style: const TextStyle(color: Colors.redAccent),
+              ),
+            )
           : RefreshIndicator(
+              onRefresh: _refresh,
               color: kAccent,
               backgroundColor: kSurface,
-              onRefresh: _fetchFeed,
-              child: _history.isEmpty
+              child: history.isEmpty
                   ? SingleChildScrollView(
                       physics: const AlwaysScrollableScrollPhysics(),
                       child: Container(
@@ -106,9 +109,9 @@ class _ViewedAuthorsScreenState extends State<ViewedAuthorsScreen> {
                   : ListView.builder(
                       physics: const AlwaysScrollableScrollPhysics(),
                       padding: const EdgeInsets.all(16),
-                      itemCount: _history.length,
+                      itemCount: history.length,
                       itemBuilder: (context, index) {
-                        final entry = _history[index];
+                        final entry = history[index];
                         final profile = entry.profile;
                         return Card(
                           color: kSurface,

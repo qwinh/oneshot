@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
 import 'package:oneshot/models/prime_content.dart';
-import 'package:oneshot/services/discovery_service.dart';
-import 'package:oneshot/services/relation_service.dart';
+import 'package:oneshot/providers/auth_provider.dart';
+import 'package:oneshot/providers/feed_provider.dart';
+import 'package:oneshot/providers/relation_provider.dart';
 import 'package:oneshot/theme/app_theme.dart';
 import '../../widgets/prime_card.dart';
 import '../profile/profile_screen.dart';
@@ -15,46 +16,36 @@ class ReadLaterScreen extends StatefulWidget {
 }
 
 class _ReadLaterScreenState extends State<ReadLaterScreen> {
-  final DiscoveryService _discoveryService = DiscoveryService();
-  final RelationService _relationService = RelationService();
-
-  List<AuthorProfile> _savedProfiles = [];
-  bool _isLoading = false;
-
   @override
   void initState() {
     super.initState();
-    _fetchFeed();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
-  Future<void> _fetchFeed() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+  Future<void> _load() async {
+    final userId = context.read<AppAuthProvider>().currentUserId;
+    if (userId == null) return;
+    await context.read<FeedProvider>().loadReadLaterFeed(userId);
+  }
 
-    setState(() => _isLoading = true);
-    try {
-      final list = await _discoveryService.getReadLaterFeed(user.uid);
-      setState(() => _savedProfiles = list);
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Error loading feed: $e')));
-    } finally {
-      setState(() => _isLoading = false);
-    }
+  Future<void> _refresh() async {
+    final userId = context.read<AppAuthProvider>().currentUserId;
+    if (userId == null) return;
+    await context.read<FeedProvider>().loadReadLaterFeed(userId);
   }
 
   Future<void> _removeFromReadLater(String authorId) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
+    final userId = context.read<AppAuthProvider>().currentUserId;
+    if (userId == null) return;
 
     try {
-      await _relationService.setReadLaterStatus(
-        viewerId: user.uid,
+      await context.read<RelationProvider>().setReadLater(
+        viewerId: userId,
         authorId: authorId,
         readLater: false,
       );
-      await _fetchFeed();
+      // Remove locally from feed provider
+      context.read<FeedProvider>().evictFromReadLater(authorId);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -150,6 +141,11 @@ class _ReadLaterScreenState extends State<ReadLaterScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final feedProvider = context.watch<FeedProvider>();
+    final isLoading = feedProvider.readLaterLoading;
+    final savedProfiles = feedProvider.readLaterFeed;
+    final error = feedProvider.readLaterError;
+
     return Scaffold(
       backgroundColor: kBg,
       appBar: AppBar(
@@ -160,17 +156,24 @@ class _ReadLaterScreenState extends State<ReadLaterScreen> {
           IconButton(
             icon: const Icon(Icons.refresh),
             tooltip: 'Refresh Shelf',
-            onPressed: _fetchFeed,
+            onPressed: _refresh,
           ),
         ],
       ),
-      body: _isLoading
+      body: isLoading
           ? const Center(child: CircularProgressIndicator(color: kAccent))
+          : error != null
+          ? Center(
+              child: Text(
+                error,
+                style: const TextStyle(color: Colors.redAccent),
+              ),
+            )
           : RefreshIndicator(
+              onRefresh: _refresh,
               color: kAccent,
               backgroundColor: kSurface,
-              onRefresh: _fetchFeed,
-              child: _savedProfiles.isEmpty
+              child: savedProfiles.isEmpty
                   ? SingleChildScrollView(
                       physics: const AlwaysScrollableScrollPhysics(),
                       child: Container(
@@ -189,9 +192,9 @@ class _ReadLaterScreenState extends State<ReadLaterScreen> {
                             mainAxisSpacing: 12,
                             childAspectRatio: 1.1,
                           ),
-                      itemCount: _savedProfiles.length,
+                      itemCount: savedProfiles.length,
                       itemBuilder: (context, index) {
-                        final profile = _savedProfiles[index];
+                        final profile = savedProfiles[index];
                         return GestureDetector(
                           onTap: () => _viewSavedCard(profile),
                           child: Container(
