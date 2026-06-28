@@ -1,7 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:oneshot/services/auth_service.dart';
+import 'package:provider/provider.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+import 'package:firebase_app_check/firebase_app_check.dart';
+
+import 'package:oneshot/providers/auth_provider.dart'; // contains AppAuthProvider
+import 'package:oneshot/providers/relation_provider.dart';
+import 'package:oneshot/providers/discovery_provider.dart';
+import 'package:oneshot/providers/feed_provider.dart';
+import 'package:oneshot/providers/profile_provider.dart';
+
 import 'package:oneshot/screens/auth/login_screen.dart';
 import 'package:oneshot/screens/composer/edit_prime_screen.dart';
 import 'package:oneshot/screens/discovery/discovery_screen.dart';
@@ -13,8 +22,6 @@ import 'package:oneshot/screens/feeds/liked_authors_screen.dart';
 import 'package:oneshot/screens/profile/profile_screen.dart';
 import 'package:oneshot/theme/app_theme.dart';
 import 'firebase_options.dart';
-import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:firebase_app_check/firebase_app_check.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -26,7 +33,18 @@ void main() async {
     webProvider: ReCaptchaV3Provider('your-recaptcha-v3-site-key'),
   );
 
-  runApp(const OneShotApp());
+  runApp(
+    MultiProvider(
+      providers: [
+        ChangeNotifierProvider(create: (_) => AppAuthProvider()),
+        ChangeNotifierProvider(create: (_) => RelationProvider()),
+        ChangeNotifierProvider(create: (_) => DiscoveryProvider()),
+        ChangeNotifierProvider(create: (_) => FeedProvider()),
+        ChangeNotifierProvider(create: (_) => ProfileProvider()),
+      ],
+      child: const OneShotApp(),
+    ),
+  );
 }
 
 class OneShotApp extends StatelessWidget {
@@ -85,16 +103,18 @@ class OneShotApp extends StatelessWidget {
   }
 }
 
-/// Dynamic Router checking user authentication and verification state transitions in real time
+/// Watches the Firebase auth stream and routes to the correct top-level
+/// screen. Uses AppAuthProvider so downstream widgets can also read auth state
+/// without reaching directly into FirebaseAuth.
 class AuthGateRouter extends StatelessWidget {
   const AuthGateRouter({super.key});
 
   @override
   Widget build(BuildContext context) {
-    final AuthService authService = AuthService();
+    final authProvider = context.read<AppAuthProvider>();
 
     return StreamBuilder<User?>(
-      stream: authService.authStateChanges,
+      stream: authProvider.authStateChanges,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Scaffold(
@@ -105,22 +125,32 @@ class AuthGateRouter extends StatelessWidget {
         final User? user = snapshot.data;
 
         if (user == null) {
+          // Clear stale provider state from a previous session.
+          _clearProviderState(context);
           return const LoginScreen();
         }
 
-        // Email Verification Gate (REQ-FUNC-001)
         if (!user.emailVerified) {
           return const EmailVerificationGateScreen();
         }
 
-        // Fully Authorized Core View
-        return const MockAuthenticatedHomeScreen();
+        return const AuthenticatedShell();
       },
     );
   }
+
+  void _clearProviderState(BuildContext context) {
+    context.read<RelationProvider>().clear();
+    context.read<DiscoveryProvider>().clear();
+    context.read<FeedProvider>().clear();
+    context.read<ProfileProvider>().clear();
+  }
 }
 
-/// The verification holding zone interface preventing content consumption or publishing (REQ-FUNC-001)
+// ─────────────────────────────────────────────────────────────────────────────
+// Email Verification Gate
+// ─────────────────────────────────────────────────────────────────────────────
+
 class EmailVerificationGateScreen extends StatefulWidget {
   const EmailVerificationGateScreen({super.key});
 
@@ -131,69 +161,58 @@ class EmailVerificationGateScreen extends StatefulWidget {
 
 class _EmailVerificationGateScreenState
     extends State<EmailVerificationGateScreen> {
-  final AuthService _authService = AuthService();
   bool _isChecking = false;
 
   Future<void> _checkVerification() async {
-    setState(() {
-      _isChecking = true;
-    });
+    setState(() => _isChecking = true);
+    final user = await context.read<AppAuthProvider>().refreshUserStatus();
+    setState(() => _isChecking = false);
 
-    final User? updatedUser = await _authService.refreshUserStatus();
-
-    setState(() {
-      _isChecking = false;
-    });
-
-    if (updatedUser != null && updatedUser.emailVerified) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Account successfully verified!'),
-            backgroundColor: Colors.green,
-          ),
-        );
-      }
+    if (!mounted) return;
+    if (user != null && user.emailVerified) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Account successfully verified!'),
+          backgroundColor: Colors.green,
+        ),
+      );
     } else {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text(
-              'Email verification is still pending. Please check your inbox.',
-            ),
-            backgroundColor: Colors.orange,
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Email verification is still pending. Please check your inbox.',
           ),
-        );
-      }
+          backgroundColor: Colors.orange,
+        ),
+      );
     }
   }
 
   Future<void> _resendVerification() async {
     try {
-      await _authService.sendVerificationEmail();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Verification email resent!'),
-            backgroundColor: Colors.blueAccent,
-          ),
-        );
-      }
+      await context.read<AppAuthProvider>().sendVerificationEmail();
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Verification email resent!'),
+          backgroundColor: Colors.blueAccent,
+        ),
+      );
     } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Error: ${e.toString()}'),
-            backgroundColor: Colors.redAccent,
-          ),
-        );
-      }
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error: ${e.toString()}'),
+          backgroundColor: Colors.redAccent,
+        ),
+      );
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final String userEmail = _authService.currentUser?.email ?? 'your email';
+    final String userEmail =
+        context.read<AppAuthProvider>().currentUser?.email ?? 'your email';
 
     return Scaffold(
       backgroundColor: Colors.grey[950],
@@ -230,8 +249,6 @@ class _EmailVerificationGateScreenState
                 ),
               ),
               const SizedBox(height: 36),
-
-              // Re-check Status button
               ElevatedButton.icon(
                 onPressed: _isChecking ? null : _checkVerification,
                 icon: _isChecking
@@ -255,8 +272,6 @@ class _EmailVerificationGateScreenState
                 ),
               ),
               const SizedBox(height: 12),
-
-              // Resend email
               TextButton.icon(
                 onPressed: _resendVerification,
                 icon: const Icon(Icons.send_outlined, color: Colors.white70),
@@ -269,10 +284,8 @@ class _EmailVerificationGateScreenState
                 ),
               ),
               const SizedBox(height: 24),
-
-              // Sign Out option to retry with a different email address
               TextButton(
-                onPressed: () => _authService.logout(),
+                onPressed: () => context.read<AppAuthProvider>().logout(),
                 child: Text(
                   'Sign Out / Login with another account',
                   style: TextStyle(
@@ -289,21 +302,18 @@ class _EmailVerificationGateScreenState
   }
 }
 
-/// Primary navigation shell once a user is authenticated and verified.
-/// Ties together Discovery, Search, and the four derived feeds via bottom
-/// navigation, with Edit Prime and Sign Out reachable from the app bar.
-/// Without this shell the individual screens (already built) are unreachable
-/// from a live demo session.
-class MockAuthenticatedHomeScreen extends StatefulWidget {
-  const MockAuthenticatedHomeScreen({super.key});
+// ─────────────────────────────────────────────────────────────────────────────
+// Authenticated Shell
+// ─────────────────────────────────────────────────────────────────────────────
+
+class AuthenticatedShell extends StatefulWidget {
+  const AuthenticatedShell({super.key});
 
   @override
-  State<MockAuthenticatedHomeScreen> createState() =>
-      _MockAuthenticatedHomeScreenState();
+  State<AuthenticatedShell> createState() => _AuthenticatedShellState();
 }
 
-class _MockAuthenticatedHomeScreenState
-    extends State<MockAuthenticatedHomeScreen> {
+class _AuthenticatedShellState extends State<AuthenticatedShell> {
   int _tabIndex = 0;
 
   static const List<Widget> _tabs = [
@@ -335,7 +345,7 @@ class _MockAuthenticatedHomeScreenState
 
   @override
   Widget build(BuildContext context) {
-    final AuthService authService = AuthService();
+    final userId = context.read<AppAuthProvider>().currentUserId;
 
     return Scaffold(
       appBar: AppBar(
@@ -344,7 +354,7 @@ class _MockAuthenticatedHomeScreenState
           IconButton(
             icon: const Icon(Icons.logout),
             tooltip: 'Sign out',
-            onPressed: () => authService.logout(),
+            onPressed: () => context.read<AppAuthProvider>().logout(),
           ),
         ],
       ),
@@ -376,28 +386,20 @@ class _MockAuthenticatedHomeScreenState
                   },
                 ),
               const Divider(color: Colors.white10),
-              ListTile(
-                leading: const Icon(Icons.person, color: Colors.white70),
-                title: const Text('Profile'),
-                onTap: () {
-                  final user = FirebaseAuth.instance.currentUser;
-                  if (user != null) {
-                    Navigator.of(context).pop(); // Close the drawer
+              // Profile item – only if user is logged in (should always be)
+              if (userId != null)
+                ListTile(
+                  leading: const Icon(Icons.person, color: Colors.white70),
+                  title: const Text('Profile'),
+                  onTap: () {
+                    Navigator.of(context).pop();
                     Navigator.of(context).push(
                       MaterialPageRoute(
-                        builder: (_) => ProfileScreen(authorId: user.uid),
+                        builder: (_) => ProfileScreen(authorId: userId),
                       ),
                     );
-                  } else {
-                    // Handle error – user not logged in (shouldn't happen here)
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('You must be logged in to view profile.'),
-                      ),
-                    );
-                  }
-                },
-              ),
+                  },
+                ),
               ListTile(
                 leading: const Icon(Icons.edit_note, color: Colors.white70),
                 title: const Text('Configure Discovery Prime'),

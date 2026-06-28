@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:oneshot/models/prime_content.dart';
+import 'package:provider/provider.dart';
 import 'package:oneshot/models/relation.dart';
-import 'package:oneshot/services/discovery_service.dart';
-import 'package:oneshot/services/relation_service.dart';
+import 'package:oneshot/providers/auth_provider.dart';
+import 'package:oneshot/providers/discovery_provider.dart';
+import 'package:oneshot/providers/relation_provider.dart';
 import 'package:oneshot/theme/app_theme.dart';
 import 'package:oneshot/widgets/action_buttons.dart';
 import '../../widgets/prime_card.dart';
@@ -17,134 +17,63 @@ class DiscoveryScreen extends StatefulWidget {
 }
 
 class _DiscoveryScreenState extends State<DiscoveryScreen> {
-  final DiscoveryService _discoveryService = DiscoveryService();
-  final RelationService _relationService = RelationService();
-
-  List<String> _tags = [];
-  String? _selectedTag;
-
-  List<AuthorProfile> _candidates = [];
-  int _currentIndex = 0;
-
-  bool _isLoading = false;
-  bool _hasLoadedOnce = false;
-  String? _statusMessage;
-
-  ViewerAuthorRelation? _currentRelation;
-
   @override
   void initState() {
     super.initState();
-    _checkForInterruptedSession();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _init());
   }
 
-  Future<void> _checkForInterruptedSession() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    setState(() => _isLoading = true);
-
-    try {
-      final fetchedTags = await _discoveryService.getAllActiveTags();
-      if (mounted) setState(() => _tags = fetchedTags);
-
-      final pendingAuthorId = await _discoveryService.findPendingCardAuthorId(
-        user.uid,
-      );
-      if (pendingAuthorId != null) {
-        final profile = await _discoveryService.getAuthorProfile(
-          pendingAuthorId,
-        );
-        if (profile != null) {
-          setState(() {
-            _candidates = [profile];
-            _currentIndex = 0;
-            _hasLoadedOnce = true;
-          });
-          await _markCurrentCardAsPending();
-          if (mounted) setState(() => _isLoading = false);
-          return;
-        }
-      }
-
-      await _loadDiscoveryFeed();
-    } catch (_) {
-      if (mounted) setState(() => _isLoading = false);
-    }
+  Future<void> _init() async {
+    final userId = context.read<AppAuthProvider>().currentUserId;
+    if (userId == null) return;
+    await context.read<DiscoveryProvider>().init(userId);
+    await _markCurrentCardAsPending();
   }
 
-  Future<void> _loadDiscoveryFeed() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null) return;
-
-    setState(() {
-      _isLoading = true;
-      _candidates = [];
-      _currentIndex = 0;
-      _statusMessage = null;
-    });
-
-    try {
-      final list = await _discoveryService.browseDiscoverable(
-        viewerId: user.uid,
-        tag: _selectedTag,
-      );
-
-      setState(() {
-        _candidates = list;
-        _isLoading = false;
-        _hasLoadedOnce = true;
-        if (list.isEmpty) {
-          _statusMessage = _selectedTag == null
-              ? 'No new creators are available to discover right now.'
-              : 'No new creators matching this tag are available.';
-        } else {
-          _markCurrentCardAsPending();
-        }
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _hasLoadedOnce = true;
-        _statusMessage = 'Error loading discovery: ${e.toString()}';
-      });
-    }
+  Future<void> _reload() async {
+    final userId = context.read<AppAuthProvider>().currentUserId;
+    if (userId == null) return;
+    final dp = context.read<DiscoveryProvider>();
+    await dp.loadFeed(userId, tag: dp.selectedTag);
+    await _markCurrentCardAsPending();
   }
 
-  void _selectTag(String? tag) {
-    if (_selectedTag == tag) return;
-    setState(() => _selectedTag = tag);
-    _loadDiscoveryFeed();
+  void _selectTag(String? tag) async {
+    final dp = context.read<DiscoveryProvider>();
+    if (dp.selectedTag == tag) return;
+    final userId = context.read<AppAuthProvider>().currentUserId;
+    if (userId == null) return;
+    await dp.loadFeed(userId, tag: tag);
+    await _markCurrentCardAsPending();
   }
 
   Future<void> _markCurrentCardAsPending() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null || _currentIndex >= _candidates.length) return;
+    final userId = context.read<AppAuthProvider>().currentUserId;
+    final dp = context.read<DiscoveryProvider>();
+    final profile = dp.currentProfile;
+    if (userId == null || profile == null) return;
 
-    final creator = _candidates[_currentIndex];
-    await _relationService.markCardAsPending(
-      viewerId: user.uid,
-      authorId: creator.uid,
+    await context.read<RelationProvider>().markCardAsPending(
+      viewerId: userId,
+      authorId: profile.uid,
     );
-
-    final rel = await _relationService.getRelation(user.uid, creator.uid);
-    if (!mounted) return;
-    setState(() => _currentRelation = rel);
+    await context.read<RelationProvider>().load(userId, profile.uid);
   }
 
   Future<void> _handleAction(ActionType action) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null || _currentIndex >= _candidates.length) return;
-
-    final creator = _candidates[_currentIndex];
+    final userId = context.read<AppAuthProvider>().currentUserId;
+    final dp = context.read<DiscoveryProvider>();
+    final profile = dp.currentProfile;
+    if (userId == null || profile == null) return;
 
     try {
-      await _relationService.resolvePendingCard(
-        viewerId: user.uid,
-        authorId: creator.uid,
+      await context.read<RelationProvider>().resolvePendingCard(
+        viewerId: userId,
+        authorId: profile.uid,
         action: action,
       );
 
+      if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('Committed action: ${action.name.toUpperCase()}'),
@@ -152,63 +81,51 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         ),
       );
 
-      setState(() {
-        _currentIndex++;
-        _currentRelation = null;
-      });
+      dp.advance();
 
-      if (_currentIndex < _candidates.length) {
-        _markCurrentCardAsPending();
-      } else {
-        setState(() {
-          _statusMessage = _selectedTag == null
-              ? 'You have discovered all available creators!'
-              : 'You have discovered all creators in this tag!';
-        });
+      if (dp.currentProfile != null) {
+        await _markCurrentCardAsPending();
       }
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Failed: ${e.toString()}')));
     }
   }
 
-  Future<void> _toggleLike(bool isLiked) async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null || _currentIndex >= _candidates.length) return;
+  Future<void> _toggleLike(bool liked) async {
+    final userId = context.read<AppAuthProvider>().currentUserId;
+    final profile = context.read<DiscoveryProvider>().currentProfile;
+    if (userId == null || profile == null) return;
 
-    final creator = _candidates[_currentIndex];
-    await _relationService.setLikedStatus(
-      viewerId: user.uid,
-      authorId: creator.uid,
-      liked: isLiked,
+    await context.read<RelationProvider>().setLiked(
+      viewerId: userId,
+      authorId: profile.uid,
+      liked: liked,
     );
-
-    setState(() {
-      if (_currentRelation != null) {
-        _currentRelation = _currentRelation!.copyWith(liked: isLiked);
-      }
-    });
   }
 
-  Future<void> _triggerProfileView() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null || _currentIndex >= _candidates.length) return;
+  Future<void> _openProfile() async {
+    final userId = context.read<AppAuthProvider>().currentUserId;
+    final profile = context.read<DiscoveryProvider>().currentProfile;
+    if (userId == null || profile == null) return;
 
-    final creator = _candidates[_currentIndex];
-    await _relationService.recordProfileVisit(
-      viewerId: user.uid,
-      authorId: creator.uid,
+    await context.read<RelationProvider>().recordProfileVisit(
+      viewerId: userId,
+      authorId: profile.uid,
     );
 
     if (!mounted) return;
     await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => ProfileScreen(authorId: creator.uid)),
+      MaterialPageRoute(builder: (_) => ProfileScreen(authorId: profile.uid)),
     );
   }
 
   @override
   Widget build(BuildContext context) {
+    final dp = context.watch<DiscoveryProvider>();
+
     return Scaffold(
       backgroundColor: kBg,
       appBar: AppBar(
@@ -218,11 +135,11 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
-            onPressed: _isLoading ? null : _loadDiscoveryFeed,
+            onPressed: dp.isLoading ? null : _reload,
           ),
         ],
       ),
-      body: _isLoading
+      body: dp.isLoading
           ? const Center(child: CircularProgressIndicator(color: kAccent))
           : Padding(
               padding: const EdgeInsets.all(16.0),
@@ -238,85 +155,55 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
                     ),
                   ),
                   const SizedBox(height: 8),
-                  SizedBox(
-                    height: 40,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _tags.length + 1,
-                      itemBuilder: (context, idx) {
-                        if (idx == 0) {
-                          final bool isSelected = _selectedTag == null;
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 8.0),
-                            child: ChoiceChip(
-                              label: const Text('All'),
-                              selected: isSelected,
-                              onSelected: (_) => _selectTag(null),
-                              backgroundColor: kSurface,
-                              selectedColor: kAccent,
-                              labelStyle: TextStyle(
-                                color: isSelected ? kBg : kTextPrimary,
-                              ),
-                            ),
-                          );
-                        }
-                        final tag = _tags[idx - 1];
-                        final isSelected = _selectedTag == tag;
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8.0),
-                          child: ChoiceChip(
-                            label: Text('#$tag'),
-                            selected: isSelected,
-                            onSelected: (_) => _selectTag(tag),
-                            backgroundColor: kSurface,
-                            selectedColor: kAccent,
-                            labelStyle: TextStyle(
-                              color: isSelected ? kBg : kTextPrimary,
-                            ),
-                          ),
-                        );
-                      },
-                    ),
+                  _TagRow(
+                    tags: dp.tags,
+                    selectedTag: dp.selectedTag,
+                    onSelect: _selectTag,
                   ),
                   const SizedBox(height: 24),
-
-                  Expanded(
-                    child: !_hasLoadedOnce
-                        ? _buildWelcomeState()
-                        : _currentIndex < _candidates.length
-                        ? Column(
-                            children: [
-                              Expanded(
-                                child: SingleChildScrollView(
-                                  child: PrimeCard(
-                                    profile: _candidates[_currentIndex],
-                                    onTapAuthor: (_) => _triggerProfileView(),
-                                  ),
-                                ),
-                              ),
-                              ActionButtons(
-                                isLiked: _currentRelation?.liked ?? false,
-                                onNext: () => _handleAction(ActionType.next),
-                                onSubscribe: () =>
-                                    _handleAction(ActionType.subscribe),
-                                onReadLater: () =>
-                                    _handleAction(ActionType.readLater),
-                                onLikeToggled: _toggleLike,
-                              ),
-                            ],
-                          )
-                        : Center(
-                            child: Text(
-                              _statusMessage ??
-                                  'All discovery opportunities complete.',
-                              textAlign: TextAlign.center,
-                              style: kSubtitleText.copyWith(fontSize: 15),
-                            ),
-                          ),
-                  ),
+                  Expanded(child: _buildBody(dp)),
                 ],
               ),
             ),
+    );
+  }
+
+  Widget _buildBody(DiscoveryProvider dp) {
+    if (!dp.hasLoadedOnce) {
+      return _buildWelcomeState();
+    }
+
+    final profile = dp.currentProfile;
+    if (profile == null) {
+      return Center(
+        child: Text(
+          dp.statusMessage ?? 'All discovery opportunities complete.',
+          textAlign: TextAlign.center,
+          style: kSubtitleText.copyWith(fontSize: 15),
+        ),
+      );
+    }
+
+    final relation = context.watch<RelationProvider>().getRelation(profile.uid);
+
+    return Column(
+      children: [
+        Expanded(
+          child: SingleChildScrollView(
+            child: PrimeCard(
+              profile: profile,
+              onTapAuthor: (_) => _openProfile(),
+            ),
+          ),
+        ),
+        ActionButtons(
+          isLiked: relation?.liked ?? false,
+          onNext: () => _handleAction(ActionType.next),
+          onSubscribe: () => _handleAction(ActionType.subscribe),
+          onReadLater: () => _handleAction(ActionType.readLater),
+          onLikeToggled: _toggleLike,
+        ),
+      ],
     );
   }
 
@@ -342,6 +229,58 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
             textAlign: TextAlign.center,
           ),
         ],
+      ),
+    );
+  }
+}
+
+class _TagRow extends StatelessWidget {
+  final List<String> tags;
+  final String? selectedTag;
+  final ValueChanged<String?> onSelect;
+
+  const _TagRow({
+    required this.tags,
+    required this.selectedTag,
+    required this.onSelect,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: 40,
+      child: ListView.builder(
+        scrollDirection: Axis.horizontal,
+        itemCount: tags.length + 1,
+        itemBuilder: (context, idx) {
+          if (idx == 0) {
+            final bool isSelected = selectedTag == null;
+            return Padding(
+              padding: const EdgeInsets.only(right: 8.0),
+              child: ChoiceChip(
+                label: const Text('All'),
+                selected: isSelected,
+                onSelected: (_) => onSelect(null),
+                backgroundColor: kSurface,
+                selectedColor: kAccent,
+                labelStyle: TextStyle(color: isSelected ? kBg : kTextPrimary),
+              ),
+            );
+          }
+          final tag = tags[idx - 1];
+          final isSelected = selectedTag == tag;
+          return Padding(
+            padding: const EdgeInsets.only(right: 8.0),
+            child: ChoiceChip(
+              label: Text('#$tag'),
+              selected: isSelected,
+              onSelected: (_) => onSelect(tag),
+              backgroundColor: kSurface,
+              selectedColor: kAccent,
+              labelStyle: TextStyle(color: isSelected ? kBg : kTextPrimary),
+            ),
+          );
+        },
       ),
     );
   }

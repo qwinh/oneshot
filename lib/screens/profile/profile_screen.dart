@@ -1,12 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:oneshot/models/prime_content.dart';
-import 'package:oneshot/models/relation.dart';
-import 'package:oneshot/models/work.dart';
-import 'package:oneshot/services/discovery_service.dart';
-import 'package:oneshot/services/relation_service.dart';
+import 'package:provider/provider.dart';
+import 'package:oneshot/providers/auth_provider.dart';
+import 'package:oneshot/providers/profile_provider.dart';
+import 'package:oneshot/providers/relation_provider.dart';
 import 'package:oneshot/theme/app_theme.dart';
-import 'package:oneshot/widgets/post_card.dart'; // ✅ added
+import 'package:oneshot/widgets/post_card.dart';
 import '../../widgets/prime_card.dart';
 
 class ProfileScreen extends StatefulWidget {
@@ -19,68 +17,42 @@ class ProfileScreen extends StatefulWidget {
 }
 
 class _ProfileScreenState extends State<ProfileScreen> {
-  final DiscoveryService _discoveryService = DiscoveryService();
-  final RelationService _relationService = RelationService();
-
-  AuthorProfile? _profile;
-  List<Work> _works = [];
-  ViewerAuthorRelation? _relation;
-  bool _isLoading = true;
-  bool _isUpdatingRelation = false;
-  String? _errorMessage;
-
   bool get _isOwnProfile =>
-      FirebaseAuth.instance.currentUser?.uid == widget.authorId;
+      context.read<AppAuthProvider>().currentUserId == widget.authorId;
 
   @override
   void initState() {
     super.initState();
-    _load();
+    WidgetsBinding.instance.addPostFrameCallback((_) => _load());
   }
 
   Future<void> _load() async {
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
+    final userId = context.read<AppAuthProvider>().currentUserId;
 
-    try {
-      final profile = await _discoveryService.getAuthorProfile(widget.authorId);
-      final works = await _discoveryService.getAuthorWorks(widget.authorId);
+    await context.read<ProfileProvider>().load(widget.authorId);
 
-      final user = FirebaseAuth.instance.currentUser;
-      ViewerAuthorRelation? relation;
-      if (user != null && !_isOwnProfile) {
-        relation = await _relationService.getRelation(
-          user.uid,
-          widget.authorId,
-        );
-        await _relationService.recordProfileVisit(
-          viewerId: user.uid,
-          authorId: widget.authorId,
-        );
-      }
+    if (userId != null && !_isOwnProfile) {
+      final rp = context.read<RelationProvider>();
+      await rp.load(userId, widget.authorId);
+      await rp.recordProfileVisit(viewerId: userId, authorId: widget.authorId);
+    }
+  }
 
-      if (!mounted) return;
-      setState(() {
-        _profile = profile;
-        _works = works;
-        _relation = relation;
-      });
-    } catch (e) {
-      if (!mounted) return;
-      setState(() => _errorMessage = 'Could not load this profile: $e');
-    } finally {
-      if (mounted) setState(() => _isLoading = false);
+  Future<void> _refresh() async {
+    final userId = context.read<AppAuthProvider>().currentUserId;
+    await context.read<ProfileProvider>().refresh(widget.authorId);
+    if (userId != null && !_isOwnProfile) {
+      await context.read<RelationProvider>().refresh(userId, widget.authorId);
     }
   }
 
   Future<void> _toggleSubscribed() async {
-    final user = FirebaseAuth.instance.currentUser;
-    final profile = _profile;
-    if (user == null || profile == null || _isUpdatingRelation) return;
+    final userId = context.read<AppAuthProvider>().currentUserId;
+    final profile = context.read<ProfileProvider>().getProfile(widget.authorId);
+    if (userId == null || profile == null) return;
 
-    final bool currentlySubscribed = _relation?.subscribed ?? false;
+    final rp = context.read<RelationProvider>();
+    final currentlySubscribed = rp.isSubscribed(widget.authorId);
 
     if (!currentlySubscribed && profile.hidden) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -93,70 +65,63 @@ class _ProfileScreenState extends State<ProfileScreen> {
       return;
     }
 
-    setState(() => _isUpdatingRelation = true);
     try {
-      await _relationService.setSubscribedStatus(
-        viewerId: user.uid,
+      await rp.setSubscribed(
+        viewerId: userId,
         authorId: widget.authorId,
         subscribed: !currentlySubscribed,
       );
-      final updated = await _relationService.getRelation(
-        user.uid,
-        widget.authorId,
-      );
-      if (!mounted) return;
-      setState(() => _relation = updated);
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Could not update: $e')));
-    } finally {
-      if (mounted) setState(() => _isUpdatingRelation = false);
     }
   }
 
   Future<void> _toggleLiked() async {
-    final user = FirebaseAuth.instance.currentUser;
-    if (user == null || _isUpdatingRelation) return;
+    final userId = context.read<AppAuthProvider>().currentUserId;
+    if (userId == null) return;
 
-    final bool currentlyLiked = _relation?.liked ?? false;
-
-    setState(() => _isUpdatingRelation = true);
+    final rp = context.read<RelationProvider>();
     try {
-      await _relationService.setLikedStatus(
-        viewerId: user.uid,
+      await rp.setLiked(
+        viewerId: userId,
         authorId: widget.authorId,
-        liked: !currentlyLiked,
+        liked: !rp.isLiked(widget.authorId),
       );
-      final updated = await _relationService.getRelation(
-        user.uid,
-        widget.authorId,
-      );
-      if (!mounted) return;
-      setState(() => _relation = updated);
     } catch (e) {
+      if (!mounted) return;
       ScaffoldMessenger.of(
         context,
       ).showSnackBar(SnackBar(content: Text('Could not update: $e')));
-    } finally {
-      if (mounted) setState(() => _isUpdatingRelation = false);
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    final pp = context.watch<ProfileProvider>();
+    final rp = context.watch<RelationProvider>();
+
+    final profile = pp.getProfile(widget.authorId);
+    final works = pp.getWorks(widget.authorId);
+    final isLoading = pp.isLoading(widget.authorId);
+    final error = pp.getError(widget.authorId);
+
+    final isUpdating = rp.isUpdating(widget.authorId);
+
     return Scaffold(
       backgroundColor: kBg,
       appBar: AppBar(
-        title: Text(_profile?.displayName ?? 'Profile'),
+        title: Text(profile?.displayName ?? 'Profile'),
         backgroundColor: kBg,
         elevation: 0,
       ),
-      body: _isLoading
+      body: isLoading
           ? const Center(child: CircularProgressIndicator(color: kAccent))
-          : _errorMessage != null
-          ? Center(child: Text(_errorMessage!, style: kSubtitleText))
-          : _profile == null
+          : error != null
+          ? Center(child: Text(error, style: kSubtitleText))
+          : profile == null
           ? const Center(
               child: Text(
                 'This profile could not be found.',
@@ -164,13 +129,13 @@ class _ProfileScreenState extends State<ProfileScreen> {
               ),
             )
           : RefreshIndicator(
-              onRefresh: _load,
+              onRefresh: _refresh,
               color: kAccent,
               backgroundColor: kSurface,
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
-                  if (_profile!.hidden)
+                  if (profile.hidden)
                     Container(
                       margin: const EdgeInsets.only(bottom: 12),
                       padding: const EdgeInsets.symmetric(
@@ -190,10 +155,17 @@ class _ProfileScreenState extends State<ProfileScreen> {
                         ),
                       ),
                     ),
-                  if (!_isOwnProfile) _buildActionRow(),
+                  if (!_isOwnProfile)
+                    _ActionRow(
+                      subscribed: rp.isSubscribed(widget.authorId),
+                      liked: rp.isLiked(widget.authorId),
+                      isUpdating: isUpdating,
+                      onToggleSubscribed: _toggleSubscribed,
+                      onToggleLiked: _toggleLiked,
+                    ),
                   const SizedBox(height: 16),
-                  PrimeCard(profile: _profile!),
-                  if (_works.isEmpty)
+                  PrimeCard(profile: profile),
+                  if (works.isEmpty)
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 12),
                       child: Text(
@@ -202,22 +174,36 @@ class _ProfileScreenState extends State<ProfileScreen> {
                       ),
                     )
                   else
-                    ..._works.map((work) => PostCard(work: work)),
+                    ...works.map((work) => PostCard(work: work)),
                 ],
               ),
             ),
     );
   }
+}
 
-  Widget _buildActionRow() {
-    final bool subscribed = _relation?.subscribed ?? false;
-    final bool liked = _relation?.liked ?? false;
+class _ActionRow extends StatelessWidget {
+  final bool subscribed;
+  final bool liked;
+  final bool isUpdating;
+  final VoidCallback onToggleSubscribed;
+  final VoidCallback onToggleLiked;
 
+  const _ActionRow({
+    required this.subscribed,
+    required this.liked,
+    required this.isUpdating,
+    required this.onToggleSubscribed,
+    required this.onToggleLiked,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Row(
       children: [
         Expanded(
           child: OutlinedButton.icon(
-            onPressed: _isUpdatingRelation ? null : _toggleSubscribed,
+            onPressed: isUpdating ? null : onToggleSubscribed,
             icon: Icon(subscribed ? Icons.check : Icons.rss_feed),
             label: Text(subscribed ? 'Subscribed' : 'Subscribe'),
             style: OutlinedButton.styleFrom(
@@ -228,7 +214,7 @@ class _ProfileScreenState extends State<ProfileScreen> {
         ),
         const SizedBox(width: 12),
         OutlinedButton(
-          onPressed: _isUpdatingRelation ? null : _toggleLiked,
+          onPressed: isUpdating ? null : onToggleLiked,
           style: OutlinedButton.styleFrom(
             foregroundColor: liked ? Colors.redAccent : kTextPrimary,
             side: const BorderSide(color: kBorder),
