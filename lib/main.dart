@@ -10,6 +10,7 @@ import 'package:oneshot/screens/feeds/subscribe_feed_screen.dart';
 import 'package:oneshot/screens/feeds/read_later_screen.dart';
 import 'package:oneshot/screens/feeds/viewed_authors_screen.dart';
 import 'package:oneshot/screens/feeds/liked_authors_screen.dart';
+import 'package:oneshot/screens/profile/profile_screen.dart';
 import 'package:oneshot/theme/app_theme.dart';
 import 'firebase_options.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
@@ -375,6 +376,28 @@ class _MockAuthenticatedHomeScreenState
                   },
                 ),
               const Divider(color: Colors.white10),
+              ListTile(
+                leading: const Icon(Icons.person, color: Colors.white70),
+                title: const Text('Profile'),
+                onTap: () {
+                  final user = FirebaseAuth.instance.currentUser;
+                  if (user != null) {
+                    Navigator.of(context).pop(); // Close the drawer
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (_) => ProfileScreen(authorId: user.uid),
+                      ),
+                    );
+                  } else {
+                    // Handle error – user not logged in (shouldn't happen here)
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('You must be logged in to view profile.'),
+                      ),
+                    );
+                  }
+                },
+              ),
               ListTile(
                 leading: const Icon(Icons.edit_note, color: Colors.white70),
                 title: const Text('Configure Discovery Prime'),
