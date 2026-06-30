@@ -28,7 +28,7 @@ class BlockController {
   final StorageService _storageService = StorageService();
   final Map<int, TextEditingController> _textControllers = {};
 
-  List<PrimeBlock> _blocks;
+  final List<PrimeBlock> _blocks;
 
   // ── Public read access ────────────────────────────────────────────────────
 
@@ -48,7 +48,12 @@ class BlockController {
       }
     }
     return _blocks
-        .where((b) => b is ImageBlock || (b as TextBlock).text.isNotEmpty)
+        .where(
+          (b) =>
+              b is ImageBlock ||
+              b is PendingImageBlock ||
+              (b as TextBlock).text.isNotEmpty,
+        )
         .toList();
   }
 
@@ -154,7 +159,7 @@ class BlockController {
         );
         final committedBlock = ImageBlock(
           url: url,
-          name: block.name.isEmpty ? 'Image ${imageCount}' : block.name,
+          name: block.name.isEmpty ? 'Image $imageCount' : block.name,
         );
         _blocks[i] = committedBlock;
         committed.add(committedBlock);

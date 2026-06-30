@@ -148,7 +148,7 @@ class ComposerImageBlock extends StatelessWidget {
                     block.url,
                     fit: BoxFit.fitWidth,
                     width: double.infinity,
-                    errorBuilder: (_, __, ___) => Container(
+                    errorBuilder: (_, _, _) => Container(
                       height: 220,
                       color: kSurface,
                       child: const Center(
