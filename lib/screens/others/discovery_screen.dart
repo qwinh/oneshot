@@ -33,17 +33,28 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
   Future<void> _reload() async {
     final userId = context.read<AppAuthProvider>().currentUserId;
     if (userId == null) return;
-    final dp = context.read<DiscoveryProvider>();
-    await dp.loadFeed(userId, tag: dp.selectedTag);
+    await context.read<DiscoveryProvider>().loadFeed(userId);
     await _markCurrentCardAsPending();
   }
 
-  void _selectTag(String? tag) async {
-    final dp = context.read<DiscoveryProvider>();
-    if (dp.selectedTag == tag) return;
+  Future<void> _addTag(String tag) async {
     final userId = context.read<AppAuthProvider>().currentUserId;
     if (userId == null) return;
-    await dp.loadFeed(userId, tag: tag);
+    await context.read<DiscoveryProvider>().addTag(userId, tag);
+    await _markCurrentCardAsPending();
+  }
+
+  Future<void> _removeTag(String tag) async {
+    final userId = context.read<AppAuthProvider>().currentUserId;
+    if (userId == null) return;
+    await context.read<DiscoveryProvider>().removeTag(userId, tag);
+    await _markCurrentCardAsPending();
+  }
+
+  Future<void> _setMatchAll(bool matchAll) async {
+    final userId = context.read<AppAuthProvider>().currentUserId;
+    if (userId == null) return;
+    await context.read<DiscoveryProvider>().setMatchAllTags(userId, matchAll);
     await _markCurrentCardAsPending();
   }
 
@@ -142,7 +153,7 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
           children: [
             // Tag header
             const Text(
-              'Browse Creators by Tag',
+              'Filter Creators by Tag',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 fontSize: 13,
@@ -150,10 +161,14 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
               ),
             ),
             const SizedBox(height: 8),
-            _TagRow(
-              tags: dp.tags,
-              selectedTag: dp.selectedTag,
-              onSelect: _selectTag,
+            _TagFilterField(
+              allTags: dp.tags,
+              selectedTags: dp.selectedTags,
+              matchAll: dp.matchAllTags,
+              suggestionsFor: dp.tagSuggestions,
+              onAddTag: _addTag,
+              onRemoveTag: _removeTag,
+              onMatchAllChanged: _setMatchAll,
             ),
             const SizedBox(height: 24),
 
@@ -221,53 +236,197 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
   }
 }
 
-class _TagRow extends StatelessWidget {
-  final List<String> tags;
-  final String? selectedTag;
-  final ValueChanged<String?> onSelect;
+/// Search-to-add tag filter: type to find a tag, tap a suggestion to add it
+/// as a chip. Selected tags appear below as removable chips, with an
+/// AND/OR toggle shown once 2+ tags are selected.
+class _TagFilterField extends StatefulWidget {
+  final List<String> allTags;
+  final List<String> selectedTags;
+  final bool matchAll;
+  final List<String> Function(String query) suggestionsFor;
+  final ValueChanged<String> onAddTag;
+  final ValueChanged<String> onRemoveTag;
+  final ValueChanged<bool> onMatchAllChanged;
 
-  const _TagRow({
-    required this.tags,
-    required this.selectedTag,
-    required this.onSelect,
+  const _TagFilterField({
+    required this.allTags,
+    required this.selectedTags,
+    required this.matchAll,
+    required this.suggestionsFor,
+    required this.onAddTag,
+    required this.onRemoveTag,
+    required this.onMatchAllChanged,
   });
 
   @override
+  State<_TagFilterField> createState() => _TagFilterFieldState();
+}
+
+class _TagFilterFieldState extends State<_TagFilterField> {
+  final TextEditingController _controller = TextEditingController();
+  final FocusNode _focusNode = FocusNode();
+  List<String> _suggestions = [];
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    _focusNode.dispose();
+    super.dispose();
+  }
+
+  void _onQueryChanged(String query) {
+    setState(() {
+      _suggestions = widget.suggestionsFor(query);
+    });
+  }
+
+  void _addTag(String tag) {
+    widget.onAddTag(tag);
+    _controller.clear();
+    setState(() {
+      _suggestions = [];
+    });
+    // Keep focus so the user can keep adding tags without re-tapping in.
+    _focusNode.requestFocus();
+  }
+
+  @override
   Widget build(BuildContext context) {
-    return SizedBox(
-      height: 40,
-      child: ListView.builder(
-        scrollDirection: Axis.horizontal,
-        itemCount: tags.length + 1,
-        itemBuilder: (context, idx) {
-          if (idx == 0) {
-            final bool isSelected = selectedTag == null;
-            return Padding(
-              padding: const EdgeInsets.only(right: 8.0),
-              child: ChoiceChip(
-                label: const Text('All'),
-                selected: isSelected,
-                onSelected: (_) => onSelect(null),
-                backgroundColor: kSurface,
-                selectedColor: kAccent,
-                labelStyle: TextStyle(color: isSelected ? kBg : kTextPrimary),
-              ),
-            );
-          }
-          final tag = tags[idx - 1];
-          final isSelected = selectedTag == tag;
-          return Padding(
-            padding: const EdgeInsets.only(right: 8.0),
-            child: ChoiceChip(
-              label: Text('#$tag'),
-              selected: isSelected,
-              onSelected: (_) => onSelect(tag),
-              backgroundColor: kSurface,
-              selectedColor: kAccent,
-              labelStyle: TextStyle(color: isSelected ? kBg : kTextPrimary),
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Search field to find and add a tag.
+        TextField(
+          controller: _controller,
+          focusNode: _focusNode,
+          onChanged: _onQueryChanged,
+          style: const TextStyle(color: kTextPrimary),
+          decoration: InputDecoration(
+            hintText: 'Search tags to add…',
+            hintStyle: const TextStyle(color: kTextSecondary),
+            prefixIcon: const Icon(Icons.search, color: kTextSecondary),
+            filled: true,
+            fillColor: kSurface,
+            border: OutlineInputBorder(
+              borderRadius: BorderRadius.circular(10),
+              borderSide: BorderSide.none,
             ),
-          );
-        },
+            contentPadding: const EdgeInsets.symmetric(vertical: 0),
+          ),
+        ),
+
+        // Suggestion list — only shown while there's a non-empty query
+        // with matches that aren't already selected.
+        if (_suggestions.isNotEmpty)
+          Container(
+            margin: const EdgeInsets.only(top: 4),
+            decoration: BoxDecoration(
+              color: kSurface,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            constraints: const BoxConstraints(maxHeight: 200),
+            child: ListView.builder(
+              shrinkWrap: true,
+              padding: EdgeInsets.zero,
+              itemCount: _suggestions.length,
+              itemBuilder: (context, idx) {
+                final tag = _suggestions[idx];
+                return ListTile(
+                  dense: true,
+                  title: Text(
+                    '#$tag',
+                    style: const TextStyle(color: kTextPrimary),
+                  ),
+                  onTap: () => _addTag(tag),
+                );
+              },
+            ),
+          ),
+
+        // Selected tag chips + AND/OR toggle.
+        if (widget.selectedTags.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              for (final tag in widget.selectedTags)
+                Chip(
+                  label: Text('#$tag'),
+                  backgroundColor: kAccent,
+                  labelStyle: const TextStyle(color: kBg),
+                  deleteIcon: const Icon(Icons.close, size: 16, color: kBg),
+                  onDeleted: () => widget.onRemoveTag(tag),
+                ),
+              if (widget.selectedTags.length > 1)
+                _MatchModeToggle(
+                  matchAll: widget.matchAll,
+                  onChanged: widget.onMatchAllChanged,
+                ),
+            ],
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// Small AND/OR segmented toggle, only relevant once 2+ tags are selected.
+class _MatchModeToggle extends StatelessWidget {
+  final bool matchAll;
+  final ValueChanged<bool> onChanged;
+
+  const _MatchModeToggle({required this.matchAll, required this.onChanged});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: kSurface,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      padding: const EdgeInsets.all(2),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          _modeButton(
+            label: 'Any',
+            selected: !matchAll,
+            onTap: () => onChanged(false),
+          ),
+          _modeButton(
+            label: 'All',
+            selected: matchAll,
+            onTap: () => onChanged(true),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _modeButton({
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: selected ? kAccent : Colors.transparent,
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: selected ? kBg : kTextSecondary,
+          ),
+        ),
       ),
     );
   }

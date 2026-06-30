@@ -139,6 +139,79 @@ class DiscoveryService {
     return profiles;
   }
 
+  /// Multi-tag discovery filter. [matchAll] = true means AND (author must
+  /// carry every tag in [tags]); false means OR (author must carry at
+  /// least one). Falls back to [browseDiscoverable] when [tags] is empty,
+  /// and to [browseByTag] when there's exactly one tag (cheaper, no
+  /// union/intersection step needed).
+  ///
+  /// Implementation note: each tag is queried independently against its
+  /// `tags/{tag}/authors` subcollection (there's no native Firestore way to
+  /// query "has ALL of these tags" against this schema), then the
+  /// per-tag result sets are combined in memory. Because each per-tag
+  /// query is itself capped at [limit], an AND query's true intersection
+  /// could in theory be larger than what's visible here if a very popular
+  /// tag's full author list isn't entirely fetched — acceptable for a
+  /// discovery feed, but worth knowing if results ever look sparse for
+  /// power users combining a very common tag with a very rare one.
+  Future<List<AuthorProfile>> browseByTags({
+    required String viewerId,
+    required List<String> tags,
+    bool matchAll = false,
+    int limit = 20,
+  }) async {
+    final List<String> normalizedTags = tags
+        .map((t) => t.toLowerCase().trim())
+        .where((t) => t.isNotEmpty)
+        .toSet()
+        .toList();
+
+    if (normalizedTags.isEmpty) {
+      return browseDiscoverable(viewerId: viewerId, limit: limit);
+    }
+
+    if (normalizedTags.length == 1) {
+      return browseByTag(
+        viewerId: viewerId,
+        tag: normalizedTags.first,
+        limit: limit,
+      );
+    }
+
+    // Fetch each tag's eligible candidates in parallel.
+    final List<List<AuthorProfile>> perTagResults = await Future.wait(
+      normalizedTags.map(
+        (t) => browseByTag(viewerId: viewerId, tag: t, limit: limit),
+      ),
+    );
+
+    if (matchAll) {
+      // AND: intersect author ids across every tag's result set.
+      Set<String>? commonIds;
+      for (final results in perTagResults) {
+        final ids = results.map((p) => p.uid).toSet();
+        commonIds = commonIds == null ? ids : commonIds.intersection(ids);
+      }
+      commonIds ??= {};
+
+      // Preserve the order of the first tag's results for stability.
+      final List<AuthorProfile> ordered = perTagResults.first
+          .where((p) => commonIds!.contains(p.uid))
+          .toList();
+
+      return ordered.take(limit).toList();
+    } else {
+      // OR: union of all result sets, deduped by author id, first-seen order.
+      final Map<String, AuthorProfile> byId = {};
+      for (final results in perTagResults) {
+        for (final p in results) {
+          byId.putIfAbsent(p.uid, () => p);
+        }
+      }
+      return byId.values.take(limit).toList();
+    }
+  }
+
   /// REQ-FUNC-007: Check for an interrupted pending card.
   /// Returns the authorId of a pending card if one exists.
   Future<String?> findPendingCardAuthorId(String viewerId) async {

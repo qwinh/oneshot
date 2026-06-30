@@ -9,7 +9,12 @@ class DiscoveryProvider extends ChangeNotifier {
   final DiscoveryService _service = DiscoveryService();
 
   List<String> _tags = [];
-  String? _selectedTag;
+
+  /// Tags currently applied as a filter. Empty means "no filter" (the
+  /// default lazy feed). Combined via [matchAllTags]: OR (any selected tag
+  /// matches) or AND (author must carry every selected tag).
+  List<String> _selectedTags = [];
+  bool _matchAllTags = false;
 
   List<AuthorProfile> _candidates = [];
   int _currentIndex = 0;
@@ -20,8 +25,11 @@ class DiscoveryProvider extends ChangeNotifier {
 
   // ── Getters ───────────────────────────────────────────────────────────────
 
+  /// All known tags, used as the suggestion source for the tag search field.
   List<String> get tags => _tags;
-  String? get selectedTag => _selectedTag;
+
+  List<String> get selectedTags => List.unmodifiable(_selectedTags);
+  bool get matchAllTags => _matchAllTags;
 
   List<AuthorProfile> get candidates => _candidates;
   int get currentIndex => _currentIndex;
@@ -37,6 +45,16 @@ class DiscoveryProvider extends ChangeNotifier {
 
   bool get hasMore => _currentIndex < _candidates.length - 1;
   bool get isFeedEmpty => _hasLoadedOnce && _candidates.isEmpty;
+
+  /// Tags matching [query] (substring match) that aren't already selected.
+  /// Used to populate the tag search field's suggestion list.
+  List<String> tagSuggestions(String query) {
+    final String normalized = query.toLowerCase().trim();
+    if (normalized.isEmpty) return [];
+    return _tags
+        .where((t) => t.contains(normalized) && !_selectedTags.contains(t))
+        .toList();
+  }
 
   // ── Init ──────────────────────────────────────────────────────────────────
 
@@ -75,8 +93,8 @@ class DiscoveryProvider extends ChangeNotifier {
 
   // ── Feed loading ──────────────────────────────────────────────────────────
 
-  Future<void> loadFeed(String viewerId, {String? tag}) async {
-    _selectedTag = tag;
+  /// Reloads the feed using the currently selected tags/match mode.
+  Future<void> loadFeed(String viewerId) async {
     await _loadFeed(viewerId);
   }
 
@@ -86,16 +104,17 @@ class DiscoveryProvider extends ChangeNotifier {
     notifyListeners();
 
     try {
-      _candidates = await _service.browseDiscoverable(
+      _candidates = await _service.browseByTags(
         viewerId: viewerId,
-        tag: _selectedTag,
+        tags: _selectedTags,
+        matchAll: _matchAllTags,
       );
       _currentIndex = 0;
       _hasLoadedOnce = true;
 
       if (_candidates.isEmpty) {
-        _statusMessage = _selectedTag != null
-            ? 'No more profiles in this category.'
+        _statusMessage = _selectedTags.isNotEmpty
+            ? 'No more profiles match this tag combination.'
             : 'No more profiles to discover right now.';
       }
     } catch (_) {
@@ -127,12 +146,49 @@ class DiscoveryProvider extends ChangeNotifier {
     notifyListeners();
   }
 
+  /// Adds [tag] to the active filter (no-op if already present) and
+  /// reloads the feed.
+  Future<void> addTag(String viewerId, String tag) async {
+    final String normalized = tag.toLowerCase().trim();
+    if (normalized.isEmpty || _selectedTags.contains(normalized)) return;
+    _selectedTags = [..._selectedTags, normalized];
+    await _loadFeed(viewerId);
+  }
+
+  /// Removes [tag] from the active filter and reloads the feed.
+  Future<void> removeTag(String viewerId, String tag) async {
+    if (!_selectedTags.contains(tag)) return;
+    _selectedTags = _selectedTags.where((t) => t != tag).toList();
+    await _loadFeed(viewerId);
+  }
+
+  /// Clears all selected tags and reloads the (unfiltered) feed.
+  Future<void> clearTags(String viewerId) async {
+    if (_selectedTags.isEmpty) return;
+    _selectedTags = [];
+    await _loadFeed(viewerId);
+  }
+
+  /// Switches between OR (any selected tag matches) and AND (all selected
+  /// tags must match). Only triggers a reload if it would change results
+  /// (i.e. 2+ tags are selected — with 0 or 1 tags the mode is moot).
+  Future<void> setMatchAllTags(String viewerId, bool matchAll) async {
+    if (_matchAllTags == matchAll) return;
+    _matchAllTags = matchAll;
+    if (_selectedTags.length > 1) {
+      await _loadFeed(viewerId);
+    } else {
+      notifyListeners();
+    }
+  }
+
   // ── Reset ─────────────────────────────────────────────────────────────────
 
   /// Full reset — call on sign-out.
   void clear() {
     _tags = [];
-    _selectedTag = null;
+    _selectedTags = [];
+    _matchAllTags = false;
     _candidates = [];
     _currentIndex = 0;
     _isLoading = false;
