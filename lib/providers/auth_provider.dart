@@ -51,4 +51,9 @@ class AppAuthProvider extends ChangeNotifier {
     await _authService.logout();
     notifyListeners();
   }
+
+  Future<void> deleteAccount({required String password}) async {
+    await _authService.deleteAccount(password: password);
+    notifyListeners();
+  }
 }

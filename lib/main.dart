@@ -21,6 +21,7 @@ import 'package:oneshot/screens/feeds/read_later_screen.dart';
 import 'package:oneshot/screens/feeds/viewed_authors_screen.dart';
 import 'package:oneshot/screens/feeds/liked_authors_screen.dart';
 import 'package:oneshot/screens/others/profile_screen.dart';
+import 'package:oneshot/screens/auth/delete_account_screen.dart';
 import 'package:oneshot/theme/app_theme.dart';
 import 'firebase_options.dart';
 
@@ -434,6 +435,26 @@ class _AuthenticatedShellState extends State<AuthenticatedShell> {
                     ),
                   ],
                 ),
+              ),
+              // Delete account — destructive, kept separate from the
+              // main nav items but above the bottom-anchored sign out.
+              ListTile(
+                leading: const Icon(
+                  Icons.delete_outline,
+                  color: Colors.redAccent,
+                ),
+                title: const Text(
+                  'Delete Account',
+                  style: TextStyle(color: Colors.redAccent),
+                ),
+                onTap: () {
+                  Navigator.of(context).pop();
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const DeleteAccountScreen(),
+                    ),
+                  );
+                },
               ),
               // Logout button at bottom of drawer
               ListTile(
