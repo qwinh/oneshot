@@ -56,8 +56,20 @@ class ProfileProvider extends ChangeNotifier {
 
   Future<void> refresh(String authorId) => load(authorId, forceRefresh: true);
 
+  Future<bool> isHandleTaken(String handle, {String? excludingUid}) {
+    return _contentService.isHandleTaken(handle, excludingUid: excludingUid);
+  }
+
   /// Updates the cached profile after an edit (e.g. from EditPrimeScreen).
   Future<void> saveProfile(AuthorProfile profile) async {
+    final bool handleTaken = await isHandleTaken(
+      profile.handle,
+      excludingUid: profile.uid,
+    );
+    if (handleTaken) {
+      throw StateError('That handle is already taken.');
+    }
+
     await _contentService.saveAuthorProfile(profile);
     final works = _cache[profile.uid]?.works ?? [];
     _cache[profile.uid] = _ProfileEntry(profile, works);

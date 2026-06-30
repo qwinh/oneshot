@@ -375,6 +375,7 @@ class XTextField extends StatelessWidget {
     required this.hint,
     required this.style,
     this.onChanged,
+    this.readOnly = false,
   }) : assert(
          controller == null || initialValue == null,
          'Provide controller OR initialValue, not both.',
@@ -385,6 +386,7 @@ class XTextField extends StatelessWidget {
   final String hint;
   final TextStyle style;
   final ValueChanged<String>? onChanged;
+  final bool readOnly;
 
   InputDecoration get _decoration => InputDecoration(
     hintText: hint,
@@ -400,6 +402,7 @@ class XTextField extends StatelessWidget {
       return TextField(
         controller: controller,
         style: style,
+        readOnly: readOnly,
         onChanged: onChanged,
         decoration: _decoration,
       );
@@ -407,6 +410,7 @@ class XTextField extends StatelessWidget {
     return TextFormField(
       initialValue: initialValue,
       style: style,
+      readOnly: readOnly,
       onChanged: onChanged,
       decoration: _decoration,
     );

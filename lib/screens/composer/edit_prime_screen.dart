@@ -28,6 +28,7 @@ class _EditPrimeScreenState extends State<EditPrimeScreen> {
 
   bool _isLoading = true;
   bool _isSaving = false;
+  bool _isHandleLocked = false;
   String? _errorMessage;
   DateTime? _existingCreatedAt;
 
@@ -79,6 +80,7 @@ class _EditPrimeScreenState extends State<EditPrimeScreen> {
           _nameController.text = profile.displayName;
           _tagsController.text = profile.tags.join(', ');
           _existingCreatedAt = profile.createdAt;
+          _isHandleLocked = profile.handle.trim().isNotEmpty;
         });
       }
     } catch (_) {
@@ -149,7 +151,7 @@ class _EditPrimeScreenState extends State<EditPrimeScreen> {
         hidden: profile.hidden,
         createdAt: profile.createdAt,
       );
-      await _contentService.saveAuthorProfile(committedProfile);
+      await profileProvider.saveProfile(committedProfile);
       await profileProvider.refresh(user.uid);
       if (mounted) {
         showComposerSnack(context, 'Published.');
@@ -239,6 +241,7 @@ class _EditPrimeScreenState extends State<EditPrimeScreen> {
                       child: XTextField(
                         controller: _handleController,
                         hint: 'handle',
+                        readOnly: _isHandleLocked,
                         style: const TextStyle(
                           color: kTextSecondary,
                           fontSize: 14,
@@ -247,6 +250,14 @@ class _EditPrimeScreenState extends State<EditPrimeScreen> {
                     ),
                   ],
                 ),
+                if (_isHandleLocked)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 4),
+                    child: Text(
+                      'Your handle is permanent.',
+                      style: TextStyle(color: kTextSecondary, fontSize: 12),
+                    ),
+                  ),
               ],
             ),
           ),
