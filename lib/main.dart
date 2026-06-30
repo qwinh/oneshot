@@ -456,6 +456,7 @@ class _AuthenticatedShellState extends State<AuthenticatedShell> {
       bottomNavigationBar: NavigationBar(
         selectedIndex: _tabIndex,
         onDestinationSelected: (i) => setState(() => _tabIndex = i),
+        labelBehavior: NavigationDestinationLabelBehavior.alwaysHide,
         destinations: [
           for (int i = 0; i < _tabLabels.length; i++)
             NavigationDestination(
