@@ -6,7 +6,7 @@ import 'package:oneshot/providers/feed_provider.dart';
 import 'package:oneshot/providers/relation_provider.dart';
 import 'package:oneshot/theme/app_theme.dart';
 import '../../widgets/prime_card.dart';
-import '../profile/profile_screen.dart';
+import '../others/profile_screen.dart';
 
 class ReadLaterScreen extends StatefulWidget {
   const ReadLaterScreen({super.key});

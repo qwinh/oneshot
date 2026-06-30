@@ -7,7 +7,7 @@ import 'package:oneshot/providers/relation_provider.dart';
 import 'package:oneshot/theme/app_theme.dart';
 import 'package:oneshot/widgets/action_buttons.dart';
 import '../../widgets/prime_card.dart';
-import '../profile/profile_screen.dart';
+import 'profile_screen.dart';
 
 class DiscoveryScreen extends StatefulWidget {
   const DiscoveryScreen({super.key});

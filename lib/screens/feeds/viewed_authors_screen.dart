@@ -4,7 +4,7 @@ import 'package:oneshot/models/relation.dart';
 import 'package:oneshot/providers/auth_provider.dart';
 import 'package:oneshot/providers/feed_provider.dart';
 import 'package:oneshot/theme/app_theme.dart';
-import '../profile/profile_screen.dart';
+import '../others/profile_screen.dart';
 
 class ViewedAuthorsScreen extends StatefulWidget {
   const ViewedAuthorsScreen({super.key});

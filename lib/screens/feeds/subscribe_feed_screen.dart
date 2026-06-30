@@ -5,7 +5,7 @@ import 'package:oneshot/providers/feed_provider.dart';
 import 'package:oneshot/theme/app_theme.dart';
 import 'package:oneshot/widgets/post_card.dart';
 import '../composer/compose_post_screen.dart';
-import '../profile/profile_screen.dart';
+import '../others/profile_screen.dart';
 
 class SubscribeFeedScreen extends StatefulWidget {
   const SubscribeFeedScreen({super.key});

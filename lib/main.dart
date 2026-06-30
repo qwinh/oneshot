@@ -14,13 +14,13 @@ import 'package:oneshot/providers/search_provider.dart';
 
 import 'package:oneshot/screens/auth/login_screen.dart';
 import 'package:oneshot/screens/composer/edit_prime_screen.dart';
-import 'package:oneshot/screens/discovery/discovery_screen.dart';
-import 'package:oneshot/screens/search/search_screen.dart';
+import 'package:oneshot/screens/others/discovery_screen.dart';
+import 'package:oneshot/screens/others/search_screen.dart';
 import 'package:oneshot/screens/feeds/subscribe_feed_screen.dart';
 import 'package:oneshot/screens/feeds/read_later_screen.dart';
 import 'package:oneshot/screens/feeds/viewed_authors_screen.dart';
 import 'package:oneshot/screens/feeds/liked_authors_screen.dart';
-import 'package:oneshot/screens/profile/profile_screen.dart';
+import 'package:oneshot/screens/others/profile_screen.dart';
 import 'package:oneshot/theme/app_theme.dart';
 import 'firebase_options.dart';
 

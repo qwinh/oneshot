@@ -6,7 +6,7 @@ import 'package:oneshot/providers/auth_provider.dart';
 import 'package:oneshot/providers/search_provider.dart';
 import 'package:oneshot/theme/app_theme.dart';
 
-import '../profile/profile_screen.dart';
+import 'profile_screen.dart';
 
 class SearchScreen extends StatefulWidget {
   const SearchScreen({super.key});
