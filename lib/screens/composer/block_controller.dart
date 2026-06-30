@@ -34,7 +34,9 @@ class BlockController {
 
   List<PrimeBlock> get blocks => _blocks;
 
-  int get imageCount => _blocks.whereType<ImageBlock>().length;
+  int get imageCount =>
+      _blocks.whereType<ImageBlock>().length +
+      _blocks.whereType<PendingImageBlock>().length;
 
   /// Flushes controller text into [_blocks] and returns a trimmed copy with
   /// blank text blocks removed. Safe to call before saving.
@@ -105,10 +107,13 @@ class BlockController {
     if (block is ImageBlock) {
       _blocks[index] = block.copyWith(name: name);
       onStateChanged();
+    } else if (block is PendingImageBlock) {
+      _blocks[index] = block.copyWith(name: name);
+      onStateChanged();
     }
   }
 
-  Future<void> pickAndUploadImageAt(int insertAfterIndex) async {
+  Future<void> pickImageAt(int insertAfterIndex) async {
     if (imageCount >= 4) {
       onError('Maximum 4 images allowed.');
       return;
@@ -129,43 +134,43 @@ class BlockController {
     final fileName =
         '${imageFilePrefix}_${user.uid}_${DateTime.now().millisecondsSinceEpoch}$ext';
 
-    // Optimistic placeholder
-    _blocks.insert(insertAfterIndex + 1, const ImageBlock(url: '', name: ''));
+    _blocks.insert(
+      insertAfterIndex + 1,
+      PendingImageBlock(bytes: bytes, fileName: fileName),
+    );
     _flushStaleControllers();
     onStateChanged();
+  }
 
-    try {
-      final url = await _storageService.uploadPrimeImage(
-        authorId: user.uid,
-        fileName: fileName,
-        bytes: bytes,
-      );
-      final placeholderIndex = _blocks.indexWhere(
-        (b) => b is ImageBlock && (b as ImageBlock).url.isEmpty,
-      );
-      if (placeholderIndex != -1) {
-        _blocks[placeholderIndex] = ImageBlock(
-          url: url,
-          name: 'Image $imageCount',
+  Future<void> commitPendingImages(String authorId) async {
+    final committed = <PrimeBlock>[];
+    for (int i = 0; i < _blocks.length; i++) {
+      final block = _blocks[i];
+      if (block is PendingImageBlock) {
+        final url = await _storageService.uploadPrimeImage(
+          authorId: authorId,
+          fileName: block.fileName,
+          bytes: block.bytes,
         );
-        onStateChanged();
+        final committedBlock = ImageBlock(
+          url: url,
+          name: block.name.isEmpty ? 'Image ${imageCount}' : block.name,
+        );
+        _blocks[i] = committedBlock;
+        committed.add(committedBlock);
       }
-    } catch (e) {
-      _blocks.removeWhere(
-        (b) => b is ImageBlock && (b as ImageBlock).url.isEmpty,
-      );
-      _flushStaleControllers();
+    }
+    if (committed.isNotEmpty) {
       onStateChanged();
-      onError('Upload failed: $e');
     }
   }
 
   Future<void> removeImageBlock(int index) async {
-    final block = _blocks[index] as ImageBlock;
+    final block = _blocks[index];
     _blocks.removeAt(index);
     _flushStaleControllers();
     onStateChanged();
-    if (block.url.isNotEmpty) {
+    if (block is ImageBlock && block.url.isNotEmpty) {
       await _storageService.deleteImageByUrl(block.url);
     }
   }

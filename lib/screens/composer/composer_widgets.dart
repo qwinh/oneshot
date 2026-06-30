@@ -55,6 +55,13 @@ class BlockComposer extends StatelessWidget {
         controller: controller,
       );
     }
+    if (block is PendingImageBlock) {
+      return ComposerPendingImageBlock(
+        index: index,
+        block: block,
+        controller: controller,
+      );
+    }
     return const SizedBox.shrink();
   }
 }
@@ -126,55 +133,54 @@ class ComposerImageBlock extends StatelessWidget {
         children: [
           ClipRRect(
             borderRadius: BorderRadius.circular(12),
-            child: AspectRatio(
-              aspectRatio: 16 / 9,
-              child: Stack(
-                fit: StackFit.expand,
-                children: [
-                  if (isUploading)
-                    Container(
+            child: Stack(
+              children: [
+                if (isUploading)
+                  Container(
+                    constraints: const BoxConstraints(minHeight: 220),
+                    color: kSurface,
+                    child: const Center(
+                      child: CircularProgressIndicator(color: kAccent),
+                    ),
+                  )
+                else
+                  Image.network(
+                    block.url,
+                    fit: BoxFit.fitWidth,
+                    width: double.infinity,
+                    errorBuilder: (_, __, ___) => Container(
+                      height: 220,
                       color: kSurface,
                       child: const Center(
-                        child: CircularProgressIndicator(color: kAccent),
-                      ),
-                    )
-                  else
-                    Image.network(
-                      block.url,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        color: kSurface,
-                        child: const Center(
-                          child: Icon(
-                            Icons.broken_image_outlined,
-                            color: kTextSecondary,
-                          ),
+                        child: Icon(
+                          Icons.broken_image_outlined,
+                          color: kTextSecondary,
                         ),
                       ),
                     ),
-                  if (!isUploading)
-                    Positioned(
-                      top: 8,
-                      right: 8,
-                      child: GestureDetector(
-                        onTap: () => controller.removeImageBlock(index),
-                        child: Container(
-                          width: 28,
-                          height: 28,
-                          decoration: const BoxDecoration(
-                            color: Colors.black45,
-                            shape: BoxShape.circle,
-                          ),
-                          child: const Icon(
-                            Icons.close,
-                            size: 16,
-                            color: Colors.white,
-                          ),
+                  ),
+                if (!isUploading)
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: GestureDetector(
+                      onTap: () => controller.removeImageBlock(index),
+                      child: Container(
+                        width: 28,
+                        height: 28,
+                        decoration: const BoxDecoration(
+                          color: Colors.black45,
+                          shape: BoxShape.circle,
+                        ),
+                        child: const Icon(
+                          Icons.close,
+                          size: 16,
+                          color: Colors.white,
                         ),
                       ),
                     ),
-                ],
-              ),
+                  ),
+              ],
             ),
           ),
           if (!isUploading)
@@ -187,6 +193,72 @@ class ComposerImageBlock extends StatelessWidget {
                 onChanged: (v) => controller.renameImageBlock(index, v),
               ),
             ),
+        ],
+      ),
+    );
+  }
+}
+
+class ComposerPendingImageBlock extends StatelessWidget {
+  const ComposerPendingImageBlock({
+    super.key,
+    required this.index,
+    required this.block,
+    required this.controller,
+  });
+
+  final int index;
+  final PendingImageBlock block;
+  final BlockController controller;
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          ClipRRect(
+            borderRadius: BorderRadius.circular(12),
+            child: Stack(
+              children: [
+                Image.memory(
+                  block.bytes,
+                  fit: BoxFit.fitWidth,
+                  width: double.infinity,
+                ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: GestureDetector(
+                    onTap: () => controller.removeImageBlock(index),
+                    child: Container(
+                      width: 28,
+                      height: 28,
+                      decoration: const BoxDecoration(
+                        color: Colors.black45,
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.close,
+                        size: 16,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: XTextField(
+              initialValue: block.name,
+              hint: 'Add image name…',
+              style: const TextStyle(color: kTextSecondary, fontSize: 13),
+              onChanged: (v) => controller.renameImageBlock(index, v),
+            ),
+          ),
         ],
       ),
     );
@@ -221,7 +293,7 @@ class _BlockInsertRow extends StatelessWidget {
             icon: Icons.add_photo_alternate_outlined,
             label: 'Image',
             disabled: controller.imageCount >= 4,
-            onTap: () => controller.pickAndUploadImageAt(afterIndex),
+            onTap: () => controller.pickImageAt(afterIndex),
           ),
           const SizedBox(width: 8),
           if (showTextChip)

@@ -70,11 +70,13 @@ class _ComposePostScreenState extends State<ComposePostScreen> {
     });
 
     try {
+      await _blockController.commitPendingImages(user.uid);
+      final publishBlocks = _blockController.trimmedBlocks;
       await _discoveryService.publishWork(
         authorId: user.uid,
         authorName: profile.displayName,
         authorHandle: profile.handle,
-        blocks: trimmedBlocks,
+        blocks: publishBlocks,
       );
       await profileProvider.refresh(user.uid);
       if (mounted) {

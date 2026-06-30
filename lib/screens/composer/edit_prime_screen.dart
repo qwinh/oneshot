@@ -139,7 +139,17 @@ class _EditPrimeScreenState extends State<EditPrimeScreen> {
     );
 
     try {
-      await _contentService.saveAuthorProfile(profile);
+      await _blockController.commitPendingImages(user.uid);
+      final committedProfile = AuthorProfile(
+        uid: profile.uid,
+        handle: profile.handle,
+        displayName: profile.displayName,
+        primeBlocks: _blockController.trimmedBlocks,
+        tags: profile.tags,
+        hidden: profile.hidden,
+        createdAt: profile.createdAt,
+      );
+      await _contentService.saveAuthorProfile(committedProfile);
       await profileProvider.refresh(user.uid);
       if (mounted) {
         showComposerSnack(context, 'Published.');

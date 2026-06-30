@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'dart:typed_data';
 
 // ─────────────────────────────────────────────
 // Block model
@@ -21,6 +22,33 @@ sealed class PrimeBlock {
     }
     return TextBlock(text: map['text'] as String? ?? '');
   }
+}
+
+class PendingImageBlock extends PrimeBlock {
+  final Uint8List bytes;
+  final String fileName;
+  final String name;
+
+  const PendingImageBlock({
+    required this.bytes,
+    required this.fileName,
+    this.name = '',
+  });
+
+  @override
+  Map<String, dynamic> toMap() {
+    throw StateError('PendingImageBlock cannot be serialized.');
+  }
+
+  PendingImageBlock copyWith({
+    Uint8List? bytes,
+    String? fileName,
+    String? name,
+  }) => PendingImageBlock(
+    bytes: bytes ?? this.bytes,
+    fileName: fileName ?? this.fileName,
+    name: name ?? this.name,
+  );
 }
 
 class TextBlock extends PrimeBlock {
