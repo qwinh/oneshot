@@ -78,15 +78,16 @@ class PostCard extends StatelessWidget {
             borderRadius: BorderRadius.circular(8),
             child: Image.network(
               block.url,
-              fit: BoxFit.contain,
+              fit: BoxFit.fitWidth,
               width: double.infinity,
-              height: 200,
               errorBuilder: (_, __, ___) => Container(
-                height: 200,
+                height: 220,
                 color: kSurface,
-                child: const Icon(
-                  Icons.broken_image_outlined,
-                  color: kTextSecondary,
+                child: const Center(
+                  child: Icon(
+                    Icons.broken_image_outlined,
+                    color: kTextSecondary,
+                  ),
                 ),
               ),
             ),
