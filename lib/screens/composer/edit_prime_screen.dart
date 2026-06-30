@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
 import 'package:oneshot/models/prime_content.dart';
+import 'package:oneshot/providers/profile_provider.dart';
 import 'package:oneshot/services/content_service.dart';
 import 'package:oneshot/theme/app_theme.dart';
 import 'block_controller.dart';
@@ -91,6 +93,7 @@ class _EditPrimeScreenState extends State<EditPrimeScreen> {
   Future<void> _save() async {
     final handle = _handleController.text.trim();
     final displayName = _nameController.text.trim();
+    final profileProvider = context.read<ProfileProvider>();
 
     if (handle.isEmpty) {
       setState(() => _errorMessage = 'Handle is required.');
@@ -137,6 +140,7 @@ class _EditPrimeScreenState extends State<EditPrimeScreen> {
 
     try {
       await _contentService.saveAuthorProfile(profile);
+      await profileProvider.refresh(user.uid);
       if (mounted) {
         showComposerSnack(context, 'Published.');
         Navigator.of(context).pop();

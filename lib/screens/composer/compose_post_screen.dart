@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
 import 'package:oneshot/services/discovery_service.dart';
+import 'package:oneshot/providers/profile_provider.dart';
 import 'package:oneshot/theme/app_theme.dart';
 import 'block_controller.dart';
 import 'composer_app_bar.dart';
@@ -44,6 +46,7 @@ class _ComposePostScreenState extends State<ComposePostScreen> {
 
   Future<void> _publish() async {
     final trimmedBlocks = _blockController.trimmedBlocks;
+    final profileProvider = context.read<ProfileProvider>();
 
     if (trimmedBlocks.isEmpty) {
       setState(() => _errorMessage = 'Add some content before publishing.');
@@ -73,6 +76,7 @@ class _ComposePostScreenState extends State<ComposePostScreen> {
         authorHandle: profile.handle,
         blocks: trimmedBlocks,
       );
+      await profileProvider.refresh(user.uid);
       if (mounted) {
         showComposerSnack(context, 'Post published!');
         Navigator.of(context).pop();

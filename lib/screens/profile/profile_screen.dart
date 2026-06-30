@@ -28,21 +28,27 @@ class _ProfileScreenState extends State<ProfileScreen> {
 
   Future<void> _load() async {
     final userId = context.read<AppAuthProvider>().currentUserId;
+    final profileProvider = context.read<ProfileProvider>();
+    final relationProvider = context.read<RelationProvider>();
 
-    await context.read<ProfileProvider>().load(widget.authorId);
+    await profileProvider.load(widget.authorId);
 
     if (userId != null && !_isOwnProfile) {
-      final rp = context.read<RelationProvider>();
-      await rp.load(userId, widget.authorId);
-      await rp.recordProfileVisit(viewerId: userId, authorId: widget.authorId);
+      await relationProvider.load(userId, widget.authorId);
+      await relationProvider.recordProfileVisit(
+        viewerId: userId,
+        authorId: widget.authorId,
+      );
     }
   }
 
   Future<void> _refresh() async {
     final userId = context.read<AppAuthProvider>().currentUserId;
-    await context.read<ProfileProvider>().refresh(widget.authorId);
+    final profileProvider = context.read<ProfileProvider>();
+    final relationProvider = context.read<RelationProvider>();
+    await profileProvider.refresh(widget.authorId);
     if (userId != null && !_isOwnProfile) {
-      await context.read<RelationProvider>().refresh(userId, widget.authorId);
+      await relationProvider.refresh(userId, widget.authorId);
     }
   }
 

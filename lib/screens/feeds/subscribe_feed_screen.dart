@@ -54,11 +54,6 @@ class _SubscribeFeedScreenState extends State<SubscribeFeedScreen> {
 
     return Scaffold(
       backgroundColor: kBg,
-      appBar: AppBar(
-        title: const Text('Subscribe Feed'),
-        backgroundColor: kBg,
-        elevation: 0,
-      ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator(color: kAccent))
           : error != null

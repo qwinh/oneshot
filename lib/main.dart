@@ -10,6 +10,7 @@ import 'package:oneshot/providers/relation_provider.dart';
 import 'package:oneshot/providers/discovery_provider.dart';
 import 'package:oneshot/providers/feed_provider.dart';
 import 'package:oneshot/providers/profile_provider.dart';
+import 'package:oneshot/providers/search_provider.dart';
 
 import 'package:oneshot/screens/auth/login_screen.dart';
 import 'package:oneshot/screens/composer/edit_prime_screen.dart';
@@ -29,8 +30,8 @@ void main() async {
   await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
 
   await FirebaseAppCheck.instance.activate(
-    androidProvider: AndroidProvider.debug,
-    webProvider: ReCaptchaV3Provider('your-recaptcha-v3-site-key'),
+    providerAndroid: const AndroidDebugProvider(),
+    providerWeb: ReCaptchaV3Provider('your-recaptcha-v3-site-key'),
   );
 
   runApp(
@@ -38,8 +39,23 @@ void main() async {
       providers: [
         ChangeNotifierProvider(create: (_) => AppAuthProvider()),
         ChangeNotifierProvider(create: (_) => RelationProvider()),
+        ChangeNotifierProxyProvider<RelationProvider, FeedProvider>(
+          create: (_) => FeedProvider(),
+          update: (_, relationProvider, feedProvider) {
+            feedProvider ??= FeedProvider();
+            feedProvider.attachRelationProvider(relationProvider);
+            return feedProvider;
+          },
+        ),
+        ChangeNotifierProxyProvider<RelationProvider, SearchProvider>(
+          create: (_) => SearchProvider(),
+          update: (_, relationProvider, searchProvider) {
+            searchProvider ??= SearchProvider();
+            searchProvider.attachRelationProvider(relationProvider);
+            return searchProvider;
+          },
+        ),
         ChangeNotifierProvider(create: (_) => DiscoveryProvider()),
-        ChangeNotifierProvider(create: (_) => FeedProvider()),
         ChangeNotifierProvider(create: (_) => ProfileProvider()),
       ],
       child: const OneShotApp(),
@@ -143,6 +159,7 @@ class AuthGateRouter extends StatelessWidget {
     context.read<RelationProvider>().clear();
     context.read<DiscoveryProvider>().clear();
     context.read<FeedProvider>().clear();
+    context.read<SearchProvider>().clear();
     context.read<ProfileProvider>().clear();
   }
 }
@@ -289,7 +306,7 @@ class _EmailVerificationGateScreenState
                 child: Text(
                   'Sign Out / Login with another account',
                   style: TextStyle(
-                    color: Colors.redAccent.withOpacity(0.85),
+                    color: Colors.redAccent.withValues(alpha: 0.85),
                     decoration: TextDecoration.underline,
                   ),
                 ),

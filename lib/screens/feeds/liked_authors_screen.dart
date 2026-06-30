@@ -40,12 +40,6 @@ class _LikedAuthorsScreenState extends State<LikedAuthorsScreen> {
 
     return Scaffold(
       backgroundColor: kBg,
-      appBar: AppBar(
-        title: const Text('Liked Authors'),
-        backgroundColor: kBg,
-        elevation: 0,
-        // Removed refresh action
-      ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator(color: kAccent))
           : error != null

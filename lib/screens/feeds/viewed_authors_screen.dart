@@ -72,12 +72,6 @@ class _ViewedAuthorsScreenState extends State<ViewedAuthorsScreen> {
 
     return Scaffold(
       backgroundColor: kBg,
-      appBar: AppBar(
-        title: const Text('Viewed History'),
-        backgroundColor: kBg,
-        elevation: 0,
-        // Removed refresh action
-      ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator(color: kAccent))
           : error != null

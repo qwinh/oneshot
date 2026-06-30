@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+
 import 'package:oneshot/models/prime_content.dart';
 import 'package:oneshot/providers/auth_provider.dart';
-import 'package:oneshot/services/discovery_service.dart';
+import 'package:oneshot/providers/search_provider.dart';
 import 'package:oneshot/theme/app_theme.dart';
+
 import '../profile/profile_screen.dart';
 
 class SearchScreen extends StatefulWidget {
@@ -14,79 +16,34 @@ class SearchScreen extends StatefulWidget {
 }
 
 class _SearchScreenState extends State<SearchScreen> {
-  final DiscoveryService _discoveryService = DiscoveryService();
   final TextEditingController _searchController = TextEditingController();
 
-  List<AuthorProfile> _results = [];
-  bool _isLoading = false;
-  bool _subscribedOnly = false;
-  Set<String> _subscribedIds = {};
-
   @override
-  void initState() {
-    super.initState();
-  }
-
-  Future<void> _refreshSubscriptions() async {
-    final user = context.read<AppAuthProvider>().currentUser;
-    if (user == null) return;
-    _subscribedIds = await _discoveryService.getSubscribedAuthorIds(user.uid);
-  }
-
-  Future<void> _loadAllSubscribed() async {
-    final user = context.read<AppAuthProvider>().currentUser;
-    if (user == null) return;
-
-    setState(() => _isLoading = true);
-    try {
-      final profiles = await _discoveryService.getSubscribedAuthors(user.uid);
-      setState(() {
-        _results = profiles;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to load subscriptions: $e')),
-      );
-    }
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
   }
 
   Future<void> _executeSearch() async {
-    final query = _searchController.text.trim();
+    final user = context.read<AppAuthProvider>().currentUser;
+    if (user == null) return;
 
-    if (_subscribedOnly && query.isEmpty) {
-      await _loadAllSubscribed();
-      return;
-    }
+    await context.read<SearchProvider>().search(
+      viewerId: user.uid,
+      query: _searchController.text,
+      subscribedOnly: context.read<SearchProvider>().subscribedOnly,
+    );
+  }
 
-    if (query.isEmpty) {
-      setState(() => _results = []);
-      return;
-    }
+  Future<void> _toggleSubscribedOnly(bool value) async {
+    final user = context.read<AppAuthProvider>().currentUser;
+    if (user == null) return;
 
-    setState(() => _isLoading = true);
-
-    try {
-      if (_subscribedOnly) {
-        await _refreshSubscriptions();
-      }
-
-      final list = await _discoveryService.searchAuthors(query);
-
-      List<AuthorProfile> filtered = list;
-      if (_subscribedOnly) {
-        filtered = list.where((p) => _subscribedIds.contains(p.uid)).toList();
-      }
-
-      setState(() => _results = filtered);
-    } catch (e) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text('Search failed: $e')));
-    } finally {
-      setState(() => _isLoading = false);
-    }
+    await context.read<SearchProvider>().search(
+      viewerId: user.uid,
+      query: _searchController.text,
+      subscribedOnly: value,
+    );
   }
 
   void _openProfile(AuthorProfile profile) {
@@ -97,13 +54,10 @@ class _SearchScreenState extends State<SearchScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final searchProvider = context.watch<SearchProvider>();
+
     return Scaffold(
       backgroundColor: kBg,
-      appBar: AppBar(
-        title: const Text('Search Authors'),
-        backgroundColor: kBg,
-        elevation: 0,
-      ),
       body: Padding(
         padding: const EdgeInsets.all(16.0),
         child: Column(
@@ -155,29 +109,24 @@ class _SearchScreenState extends State<SearchScreen> {
                 ),
                 const Spacer(),
                 Switch(
-                  value: _subscribedOnly,
-                  onChanged: (value) async {
-                    setState(() {
-                      _subscribedOnly = value;
-                    });
-                    await _executeSearch();
-                  },
-                  activeColor: kAccent,
+                  value: searchProvider.subscribedOnly,
+                  onChanged: _toggleSubscribedOnly,
+                  activeThumbColor: kAccent,
                 ),
               ],
             ),
             const SizedBox(height: 16),
             Expanded(
-              child: _isLoading
+              child: searchProvider.isLoading
                   ? const Center(
                       child: CircularProgressIndicator(color: kAccent),
                     )
-                  : _results.isEmpty
-                  ? _buildEmptyState()
+                  : searchProvider.results.isEmpty
+                  ? _buildEmptyState(searchProvider.subscribedOnly)
                   : ListView.builder(
-                      itemCount: _results.length,
+                      itemCount: searchProvider.results.length,
                       itemBuilder: (context, index) {
-                        final profile = _results[index];
+                        final profile = searchProvider.results[index];
                         return Card(
                           color: kSurface,
                           margin: const EdgeInsets.only(bottom: 10),
@@ -214,13 +163,14 @@ class _SearchScreenState extends State<SearchScreen> {
     );
   }
 
-  Widget _buildEmptyState() {
-    String message = 'No Results Found';
-    String hint = 'Enter an exact handle or displayName prefix to query.';
-    if (_subscribedOnly) {
-      message = 'No subscribed authors found';
-      hint = 'Toggle off to search all authors.';
-    }
+  Widget _buildEmptyState(bool subscribedOnly) {
+    final String message = subscribedOnly
+        ? 'No subscribed authors found'
+        : 'No Results Found';
+    final String hint = subscribedOnly
+        ? 'Toggle off to search all authors.'
+        : 'Enter an exact handle or displayName prefix to query.';
+
     return Center(
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,

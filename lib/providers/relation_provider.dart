@@ -2,6 +2,28 @@ import 'package:flutter/foundation.dart';
 import '../models/relation.dart';
 import '../services/relation_service.dart';
 
+enum RelationChangeKind { subscribed, liked, readLater, discovery }
+
+class RelationChange {
+  final RelationChangeKind kind;
+  final String viewerId;
+  final String authorId;
+  final bool? subscribed;
+  final bool? liked;
+  final bool? readLater;
+  final ActionType? action;
+
+  const RelationChange({
+    required this.kind,
+    required this.viewerId,
+    required this.authorId,
+    this.subscribed,
+    this.liked,
+    this.readLater,
+    this.action,
+  });
+}
+
 /// Caches ViewerAuthorRelation objects keyed by authorId.
 /// Screens read from this cache instead of calling RelationService directly,
 /// so any mutation (subscribe, like, read-later) immediately reflects
@@ -15,6 +37,9 @@ class RelationProvider extends ChangeNotifier {
   // authorId -> in-flight update flag (prevents double-taps)
   final Set<String> _updating = {};
 
+  int _changeVersion = 0;
+  RelationChange? _lastChange;
+
   // ── Read ──────────────────────────────────────────────────────────────────
 
   ViewerAuthorRelation? getRelation(String authorId) => _cache[authorId];
@@ -26,6 +51,10 @@ class RelationProvider extends ChangeNotifier {
   bool isLiked(String authorId) => _cache[authorId]?.liked ?? false;
 
   bool isReadLater(String authorId) => _cache[authorId]?.readLater ?? false;
+
+  int get changeVersion => _changeVersion;
+
+  RelationChange? get lastChange => _lastChange;
 
   // ── Load ──────────────────────────────────────────────────────────────────
 
@@ -64,6 +93,14 @@ class RelationProvider extends ChangeNotifier {
       );
       // Optimistic update so the UI flips instantly.
       _patch(authorId, subscribed: subscribed);
+      _markChange(
+        RelationChange(
+          kind: RelationChangeKind.subscribed,
+          viewerId: viewerId,
+          authorId: authorId,
+          subscribed: subscribed,
+        ),
+      );
     } finally {
       _updating.remove(authorId);
       notifyListeners();
@@ -85,6 +122,14 @@ class RelationProvider extends ChangeNotifier {
         liked: liked,
       );
       _patch(authorId, liked: liked);
+      _markChange(
+        RelationChange(
+          kind: RelationChangeKind.liked,
+          viewerId: viewerId,
+          authorId: authorId,
+          liked: liked,
+        ),
+      );
     } finally {
       _updating.remove(authorId);
       notifyListeners();
@@ -106,6 +151,14 @@ class RelationProvider extends ChangeNotifier {
         readLater: readLater,
       );
       _patch(authorId, readLater: readLater);
+      _markChange(
+        RelationChange(
+          kind: RelationChangeKind.readLater,
+          viewerId: viewerId,
+          authorId: authorId,
+          readLater: readLater,
+        ),
+      );
     } finally {
       _updating.remove(authorId);
       notifyListeners();
@@ -122,6 +175,14 @@ class RelationProvider extends ChangeNotifier {
       viewerId: viewerId,
       authorId: authorId,
       action: action,
+    );
+    _markChange(
+      RelationChange(
+        kind: RelationChangeKind.discovery,
+        viewerId: viewerId,
+        authorId: authorId,
+        action: action,
+      ),
     );
     await _fetch(viewerId, authorId);
   }
@@ -168,6 +229,11 @@ class RelationProvider extends ChangeNotifier {
     }
   }
 
+  void _markChange(RelationChange change) {
+    _lastChange = change;
+    _changeVersion++;
+  }
+
   /// Removes a single entry from the cache (e.g. after sign-out).
   void evict(String authorId) {
     _cache.remove(authorId);
@@ -178,6 +244,8 @@ class RelationProvider extends ChangeNotifier {
   void clear() {
     _cache.clear();
     _updating.clear();
+    _lastChange = null;
+    _changeVersion = 0;
     notifyListeners();
   }
 }

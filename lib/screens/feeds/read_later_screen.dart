@@ -44,8 +44,6 @@ class _ReadLaterScreenState extends State<ReadLaterScreen> {
         authorId: authorId,
         readLater: false,
       );
-      // Remove locally from feed provider
-      context.read<FeedProvider>().evictFromReadLater(authorId);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -148,12 +146,6 @@ class _ReadLaterScreenState extends State<ReadLaterScreen> {
 
     return Scaffold(
       backgroundColor: kBg,
-      appBar: AppBar(
-        title: const Text('Read Later Shelf'),
-        backgroundColor: kBg,
-        elevation: 0,
-        // Removed refresh action
-      ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator(color: kAccent))
           : error != null

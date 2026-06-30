@@ -50,14 +50,15 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
   Future<void> _markCurrentCardAsPending() async {
     final userId = context.read<AppAuthProvider>().currentUserId;
     final dp = context.read<DiscoveryProvider>();
+    final relationProvider = context.read<RelationProvider>();
     final profile = dp.currentProfile;
     if (userId == null || profile == null) return;
 
-    await context.read<RelationProvider>().markCardAsPending(
+    await relationProvider.markCardAsPending(
       viewerId: userId,
       authorId: profile.uid,
     );
-    await context.read<RelationProvider>().load(userId, profile.uid);
+    await relationProvider.load(userId, profile.uid);
   }
 
   Future<void> _handleAction(ActionType action) async {
@@ -132,11 +133,6 @@ class _DiscoveryScreenState extends State<DiscoveryScreen> {
 
     return Scaffold(
       backgroundColor: kBg,
-      appBar: AppBar(
-        title: const Text('OneShot Discovery'),
-        backgroundColor: kBg,
-        elevation: 0,
-      ),
       body: RefreshIndicator(
         onRefresh: _reload,
         color: kAccent,
